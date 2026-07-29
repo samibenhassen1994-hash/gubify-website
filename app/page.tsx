@@ -176,7 +176,7 @@ export default function Home() {
           <a href="#features">Features</a>
           <a href="#how-it-works">How it works</a>
           <a href="#communities">Communities</a>
-          <a href="/support">Support us</a>
+          <a href="/fundraising">Support us</a>
           <a href="#about">About</a>
         </nav>
 
@@ -196,7 +196,7 @@ export default function Home() {
         </a>
       </nav>
 
-      <a className="mobile-support-fab" href="/support" aria-label="Open the Gubify support page">
+      <a className="mobile-support-fab" href="/fundraising" aria-label="Support Gubify">
         <span aria-hidden="true">♥</span>
         <strong>Support</strong>
       </a>
@@ -221,7 +221,7 @@ export default function Home() {
             <a className="primary-button" href="#how-it-works">
               See how it works <span aria-hidden="true">→</span>
             </a>
-            <a className="support-link" href="/support">
+            <a className="support-link" href="/fundraising">
               Support the project <span aria-hidden="true">→</span>
             </a>
           </div>

@@ -101,7 +101,7 @@ test("renders the pre-registration page and form", async () => {
   assert.match(html, /href=["']\/privacy["']/i);
 });
 
-test("renders the privacy policy and support center", async () => {
+test("renders the privacy policy, support center and fundraising page", async () => {
   const worker = await loadWorker();
   const privacyResponse = await worker.fetch(
     new Request("http://localhost/privacy", { headers: { accept: "text/html" } }),
@@ -113,8 +113,14 @@ test("renders the privacy policy and support center", async () => {
     baseEnv,
     executionContext,
   );
+  const fundraisingResponse = await worker.fetch(
+    new Request("http://localhost/fundraising", { headers: { accept: "text/html" } }),
+    baseEnv,
+    executionContext,
+  );
   const privacyHtml = await privacyResponse.text();
   const supportHtml = await supportResponse.text();
+  const fundraisingHtml = await fundraisingResponse.text();
 
   assert.equal(privacyResponse.status, 200);
   assert.match(privacyHtml, /Privacy Policy and Personal Data Processing Notice/i);
@@ -123,6 +129,10 @@ test("renders the privacy policy and support center", async () => {
   assert.match(supportHtml, /Gubify Support Center/i);
   assert.match(supportHtml, /id=["']delete-pre-registration["']/i);
   assert.match(supportHtml, /mailto:privacy@gubify\.com/i);
+  assert.match(supportHtml, /href=["']\/fundraising["']/i);
+  assert.equal(fundraisingResponse.status, 200);
+  assert.match(fundraisingHtml, /<h1[^>]*>Support Gubify<\/h1>/i);
+  assert.match(fundraisingHtml, /https:\/\/gofund\.me\/8faaabb1c/i);
 });
 
 test("home links to the pre-registration page", async () => {
