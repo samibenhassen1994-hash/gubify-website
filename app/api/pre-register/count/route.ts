@@ -5,7 +5,7 @@ import {
 } from "@/lib/pre-registration-cache";
 
 type RuntimeEnv = {
-  DB?: D1Database;
+  COUNT?: D1Database;
 };
 
 export async function GET() {
@@ -18,9 +18,9 @@ export async function GET() {
     }
 
     const runtime = env as unknown as RuntimeEnv;
-    if (!runtime.DB) throw new Error("D1 unavailable");
+    if (!runtime.COUNT) throw new Error("D1 unavailable");
 
-    const row = await runtime.DB.prepare(
+    const row = await runtime.COUNT.prepare(
       "SELECT COUNT(*) AS count FROM pre_registrations WHERE status = ?",
     )
       .bind("active")

@@ -6,7 +6,7 @@ import {
 } from "@/lib/pre-registration";
 
 type RuntimeEnv = {
-  DB?: D1Database;
+  COUNT?: D1Database;
   TURNSTILE_SECRET_KEY?: string;
 };
 
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     }
 
     const runtime = env as unknown as RuntimeEnv;
-    if (!runtime.DB || !runtime.TURNSTILE_SECRET_KEY) {
+    if (!runtime.COUNT || !runtime.TURNSTILE_SECRET_KEY) {
       return Response.json(
         { ok: false, error: "Something went wrong. Please try again." },
         { status: 500 },
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     }
 
     const created = await savePreRegistration(
-      runtime.DB,
+      runtime.COUNT,
       validation.data,
       Date.now(),
       crypto.randomUUID(),

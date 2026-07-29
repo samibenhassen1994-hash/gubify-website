@@ -34,7 +34,7 @@ npx wrangler d1 execute gubify-pre-registrations --remote --file=drizzle/0000_cu
 
 The create command prints the real database ID. Do not add a fabricated ID to
 the repository. Connect the created database to the deployed Sites project
-using the logical binding `DB` declared in `.openai/hosting.json`.
+using the logical binding `COUNT` declared in `.openai/hosting.json`.
 
 For a local D1 instance:
 
@@ -60,7 +60,7 @@ npx wrangler secret put TURNSTILE_SECRET_KEY
 
 Confirm that the deployed Worker has:
 
-- D1 binding `DB`, connected to `gubify-pre-registrations`;
+- D1 binding `COUNT`, connected to `gubify-pre-registrations`;
 - secret `TURNSTILE_SECRET_KEY`;
 - build-time value `NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
 

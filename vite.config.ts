@@ -5,12 +5,19 @@ import { sites } from "./build/sites-vite-plugin";
 
 const { r2 } = hostingConfig;
 
+const countDatabase = {
+  binding: "COUNT",
+  database_name: "gubify-pre-registrations",
+  database_id: "8e4b92c0-c106-4639-93b7-555522433af8",
+};
+
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
-const localBindingConfig = {
+const workerConfig = {
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
+  d1_databases: [countDatabase],
   r2_buckets: r2
     ? [
         {
@@ -19,6 +26,11 @@ const localBindingConfig = {
         },
       ]
     : [],
+  env: {
+    production: {
+      d1_databases: [countDatabase],
+    },
+  },
 };
 
 export default defineConfig(async () => {
@@ -45,7 +57,7 @@ export default defineConfig(async () => {
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
-        config: localBindingConfig,
+        config: workerConfig,
       }),
     ],
   };

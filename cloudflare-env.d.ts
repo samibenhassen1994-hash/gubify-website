@@ -6,7 +6,7 @@ interface Fetcher {
 
 declare module "cloudflare:workers" {
   export const env: {
-    DB?: D1Database;
+    COUNT?: D1Database;
     TURNSTILE_SECRET_KEY?: string;
     [key: string]: unknown;
   };

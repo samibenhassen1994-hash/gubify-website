@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   calculateBetaProgress,
@@ -8,6 +9,20 @@ import {
 
 const developmentPreviewMeta =
   /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
+
+test("generated deploy config preserves the COUNT D1 binding", async () => {
+  const config = JSON.parse(
+    await readFile(new URL("../dist/server/wrangler.json", import.meta.url), "utf8"),
+  );
+  const expected = {
+    binding: "COUNT",
+    database_name: "gubify-pre-registrations",
+    database_id: "8e4b92c0-c106-4639-93b7-555522433af8",
+  };
+
+  assert.deepEqual(config.d1_databases, [expected]);
+  assert.deepEqual(config.env.production.d1_databases, [expected]);
+});
 
 test("renders development preview metadata", async () => {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -214,7 +229,7 @@ test("valid registration passes Turnstile and is saved", async () => {
     },
   };
   globalThis.__cloudflareTestEnv = {
-    DB: database,
+    COUNT: database,
     TURNSTILE_SECRET_KEY: "server-secret",
   };
   globalThis.fetch = async (input, init) => {
@@ -239,7 +254,7 @@ test("valid registration passes Turnstile and is saved", async () => {
           website: "",
         }),
       }),
-      { ...baseEnv, DB: database, TURNSTILE_SECRET_KEY: "server-secret" },
+      { ...baseEnv, COUNT: database, TURNSTILE_SECRET_KEY: "server-secret" },
       executionContext,
     );
     const result = await response.json();
@@ -305,10 +320,10 @@ test("public count endpoint returns active aggregate data only", async () => {
       };
     },
   };
-  globalThis.__cloudflareTestEnv = { DB: database };
+  globalThis.__cloudflareTestEnv = { COUNT: database };
   const response = await worker.fetch(
     new Request("http://localhost/api/pre-register/count"),
-    { ...baseEnv, DB: database },
+    { ...baseEnv, COUNT: database },
     executionContext,
   );
   const data = await response.json();
