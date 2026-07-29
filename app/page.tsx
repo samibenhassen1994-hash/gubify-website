@@ -174,6 +174,7 @@ export default function Home() {
         <nav className="main-nav" aria-label="Main navigation">
           <a href="#features">Features</a>
           <a href="#how-it-works">How it works</a>
+          <a href="#communities">Communities</a>
           <a href="/support">Support us</a>
           <a href="#about">About</a>
         </nav>
@@ -454,6 +455,101 @@ export default function Home() {
             );
           })}
         </div>
+      </section>
+
+      <section className="community-section section" id="communities">
+        <div className="community-intro">
+          <div className="community-copy">
+            <span className="eyebrow">Communities</span>
+            <h2>Find your people. Build something together.</h2>
+            <p>
+              Private Gubs help the people you already know organize everyday
+              life. Communities let you connect with new people around a shared
+              interest, place, project or purpose.
+            </p>
+          </div>
+
+          <div className="community-preview" aria-label="Preview of the Calabria Creators public community">
+            <span className="community-preview-glow" aria-hidden="true" />
+            <div className="community-preview-top">
+              <span className="community-logo" aria-hidden="true">CC</span>
+              <span className="community-public-badge">Public Community</span>
+            </div>
+            <h3>Calabria Creators</h3>
+            <div className="community-members">
+              <span className="community-avatar community-avatar-one" aria-hidden="true">A</span>
+              <span className="community-avatar community-avatar-two" aria-hidden="true">M</span>
+              <span className="community-avatar community-avatar-three" aria-hidden="true">L</span>
+              <strong>1,248 members</strong>
+            </div>
+            <p>
+              A place for creators, developers and people building new ideas in
+              Calabria.
+            </p>
+            <div className="community-topics" aria-label="Community topics">
+              <span>Startups</span>
+              <span>Design</span>
+              <span>Technology</span>
+              <span>Local events</span>
+            </div>
+            <button className="community-join-button" type="button" disabled>
+              Join Community
+            </button>
+            <small>Community experiences are coming to Gubify over time.</small>
+          </div>
+        </div>
+
+        <div className="community-comparison" aria-label="Private Gubs and Communities compared">
+          <article className="community-type-card community-private-card">
+            <div className="community-card-heading">
+              <span className="community-type-icon" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              <span className="community-card-label">People you know</span>
+            </div>
+            <h3>Private Gubs</h3>
+            <p>
+              Invite-only spaces for friends, couples, families, roommates and
+              teams.
+            </p>
+            <ul>
+              <li>People you already know</li>
+              <li>Private and invite-only</li>
+              <li>Organize everyday life together</li>
+              <li>Tasks, events, proposals and shared budgets</li>
+            </ul>
+          </article>
+
+          <article className="community-type-card community-public-card">
+            <div className="community-card-heading">
+              <span className="community-type-icon" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              <span className="community-card-label">People to discover</span>
+            </div>
+            <h3>Communities</h3>
+            <p>
+              Public spaces where people meet, talk and participate around
+              something they care about.
+            </p>
+            <ul>
+              <li>Discoverable by new members</li>
+              <li>Built around shared interests</li>
+              <li>Public community conversations</li>
+              <li>New community features coming over time</li>
+            </ul>
+          </article>
+        </div>
+
+        <p className="community-together-note">
+          <strong>One app, two ways to belong.</strong>
+          Gubify will bring private groups and public communities together in
+          the same experience.
+        </p>
       </section>
 
       <section className="about-section section" id="about">
