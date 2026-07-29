@@ -16,5 +16,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.8,
     },
+    {
+      url: "https://gubify.com/pre-register",
+      lastModified: new Date("2026-07-29T00:00:00+02:00"),
+      changeFrequency: "weekly",
+      priority: 0.9,
+    },
   ];
 }

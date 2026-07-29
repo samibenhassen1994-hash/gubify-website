@@ -224,6 +224,14 @@ export default function Home() {
               Support the project <span aria-hidden="true">→</span>
             </a>
           </div>
+          <a
+            className="pre-register-sticker"
+            href="/pre-register"
+            aria-label="Pre-register for the Gubify launch"
+          >
+            <strong>Pre-register</strong>
+            <span>Get launch access</span>
+          </a>
         </div>
 
         <div className="hero-demo" id="hero-demo" aria-label="Interactive Gubify chat demonstration">
