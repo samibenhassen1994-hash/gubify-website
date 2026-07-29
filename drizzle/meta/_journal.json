@@ -8,6 +8,13 @@
       "when": 1785294187241,
       "tag": "0000_cuddly_wither",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1785331465658,
+      "tag": "0001_polite_wallop",
+      "breakpoints": true
     }
   ]
 }

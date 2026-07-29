@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import LegalFooter from "./legal-footer";
 
 const launchDate = new Date("2026-09-15T18:00:00+02:00");
 const initialCountdown = {
@@ -630,14 +631,7 @@ export default function Home() {
         </a>
       </section>
 
-      <footer>
-        <a className="brand footer-brand" href="#top">
-          <span className="brand-mark" aria-hidden="true">G</span>
-          <span>Gubify</span>
-        </a>
-        <p>Turn every message into action.</p>
-        <span>© 2026 Gubify. All rights reserved.</span>
-      </footer>
+      <LegalFooter />
     </main>
   );
 }

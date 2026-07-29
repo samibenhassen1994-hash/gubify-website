@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import PreRegisterForm from "./pre-register-form";
+import LegalFooter from "../legal-footer";
 
 export const metadata: Metadata = {
   title: "Pre-register for Gubify | Get notified at launch",
@@ -68,6 +69,7 @@ export default function PreRegisterPage() {
 
         <PreRegisterForm />
       </section>
+      <LegalFooter />
     </main>
   );
 }

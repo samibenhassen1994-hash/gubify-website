@@ -75,6 +75,35 @@ test("renders the pre-registration page and form", async () => {
   assert.match(html, /Be among the first to use Gubify/i);
   assert.match(html, /Get your launch notification/i);
   assert.match(html, /Which device would you use Gubify on/i);
+  assert.match(
+    html,
+    /<input(?=[^>]*\bname=["']consentGiven["'])(?=[^>]*\brequired(?:=["'][^"']*["'])?)[^>]*>/i,
+  );
+  assert.match(html, /href=["']\/privacy["']/i);
+});
+
+test("renders the privacy policy and support center", async () => {
+  const worker = await loadWorker();
+  const privacyResponse = await worker.fetch(
+    new Request("http://localhost/privacy", { headers: { accept: "text/html" } }),
+    baseEnv,
+    executionContext,
+  );
+  const supportResponse = await worker.fetch(
+    new Request("http://localhost/support", { headers: { accept: "text/html" } }),
+    baseEnv,
+    executionContext,
+  );
+  const privacyHtml = await privacyResponse.text();
+  const supportHtml = await supportResponse.text();
+
+  assert.equal(privacyResponse.status, 200);
+  assert.match(privacyHtml, /Privacy Policy and Personal Data Processing Notice/i);
+  assert.match(privacyHtml, /2026-07-29/);
+  assert.equal(supportResponse.status, 200);
+  assert.match(supportHtml, /Gubify Support Center/i);
+  assert.match(supportHtml, /id=["']delete-pre-registration["']/i);
+  assert.match(supportHtml, /mailto:privacy@gubify\.com/i);
 });
 
 test("home links to the pre-registration page", async () => {
@@ -92,7 +121,7 @@ test("normalizes and validates registration data including UTM values", () => {
     firstName: "  Sam  ",
     email: "  SAM@EXAMPLE.COM ",
     deviceInterest: "android",
-    consent: true,
+    consentGiven: true,
     turnstileToken: "token",
     website: "",
     utmSource: " instagram ",
@@ -110,7 +139,7 @@ test("normalizes and validates registration data including UTM values", () => {
     validateRegistrationPayload({
       email: "invalid",
       deviceInterest: "android",
-      consent: true,
+      consentGiven: true,
       turnstileToken: "token",
     }).ok,
     false,
@@ -119,7 +148,16 @@ test("normalizes and validates registration data including UTM values", () => {
     validateRegistrationPayload({
       email: "valid@example.com",
       deviceInterest: "tablet",
-      consent: true,
+      consentGiven: true,
+      turnstileToken: "token",
+    }).ok,
+    false,
+  );
+  assert.equal(
+    validateRegistrationPayload({
+      email: "valid@example.com",
+      deviceInterest: "android",
+      consentGiven: false,
       turnstileToken: "token",
     }).ok,
     false,
@@ -145,16 +183,77 @@ test("duplicate registrations remain successful without a second insert", async 
   const validation = validateRegistrationPayload({
     email: "person@example.com",
     deviceInterest: "ios",
-    consent: true,
+    consentGiven: true,
     turnstileToken: "token",
     website: "",
   });
   assert.equal(validation.ok, true);
 
   assert.equal(await savePreRegistration(database, validation.data, 1, "id-1"), true);
+  assert.equal(boundValues[0][5], true);
+  assert.equal(boundValues[0][6], 1);
+  assert.equal(boundValues[0][7], "2026-07-29");
   changes = 0;
   assert.equal(await savePreRegistration(database, validation.data, 2, "id-2"), false);
   assert.equal(boundValues.length, 2);
+});
+
+test("valid registration passes Turnstile and is saved", async () => {
+  const worker = await loadWorker();
+  const originalFetch = globalThis.fetch;
+  const savedValues = [];
+  const database = {
+    prepare(sql) {
+      assert.match(sql, /privacy_policy_version/);
+      return {
+        bind(...values) {
+          savedValues.push(values);
+          return { run: async () => ({ meta: { changes: 1 } }) };
+        },
+      };
+    },
+  };
+  globalThis.__cloudflareTestEnv = {
+    DB: database,
+    TURNSTILE_SECRET_KEY: "server-secret",
+  };
+  globalThis.fetch = async (input, init) => {
+    assert.equal(String(input), "https://challenges.cloudflare.com/turnstile/v0/siteverify");
+    assert.equal(init.method, "POST");
+    assert.equal(init.body.get("secret"), "server-secret");
+    assert.equal(init.body.get("response"), "valid-token");
+    return Response.json({ success: true });
+  };
+
+  try {
+    const response = await worker.fetch(
+      new Request("http://localhost/api/pre-register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "valid@example.com",
+          firstName: "Sami",
+          deviceInterest: "android",
+          consentGiven: true,
+          turnstileToken: "valid-token",
+          website: "",
+        }),
+      }),
+      { ...baseEnv, DB: database, TURNSTILE_SECRET_KEY: "server-secret" },
+      executionContext,
+    );
+    const result = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(result.ok, true);
+    assert.equal(savedValues.length, 1);
+    assert.equal(savedValues[0][5], true);
+    assert.equal(savedValues[0][7], "2026-07-29");
+    assert.equal(typeof savedValues[0][6], "number");
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete globalThis.__cloudflareTestEnv;
+  }
 });
 
 test("calculates beta progress safely", () => {

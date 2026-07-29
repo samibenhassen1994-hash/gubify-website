@@ -12,9 +12,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     {
       url: "https://gubify.com/support",
-      lastModified,
+      lastModified: new Date("2026-07-29T00:00:00+02:00"),
       changeFrequency: "monthly",
       priority: 0.8,
+    },
+    {
+      url: "https://gubify.com/privacy",
+      lastModified: new Date("2026-07-29T00:00:00+02:00"),
+      changeFrequency: "monthly",
+      priority: 0.7,
     },
     {
       url: "https://gubify.com/pre-register",

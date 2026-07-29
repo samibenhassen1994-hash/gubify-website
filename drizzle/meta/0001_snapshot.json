@@ -1,0 +1,180 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "0af6eb3a-90b3-4acc-ac50-f76f7ddce4b2",
+  "prevId": "39b3de5c-8438-4e88-ac09-70e074f1826f",
+  "tables": {
+    "pre_registrations": {
+      "name": "pre_registrations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "first_name": {
+          "name": "first_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "device_interest": {
+          "name": "device_interest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "consent_version": {
+          "name": "consent_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "consent_given": {
+          "name": "consent_given",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "consent_at": {
+          "name": "consent_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "privacy_policy_version": {
+          "name": "privacy_policy_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "utm_source": {
+          "name": "utm_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "utm_medium": {
+          "name": "utm_medium",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "utm_campaign": {
+          "name": "utm_campaign",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "utm_content": {
+          "name": "utm_content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "utm_term": {
+          "name": "utm_term",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "landing_path": {
+          "name": "landing_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'active'"
+        }
+      },
+      "indexes": {
+        "pre_registrations_email_unique": {
+          "name": "pre_registrations_email_unique",
+          "columns": [
+            "email"
+          ],
+          "isUnique": true
+        },
+        "pre_registrations_status_idx": {
+          "name": "pre_registrations_status_idx",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        },
+        "pre_registrations_utm_source_idx": {
+          "name": "pre_registrations_utm_source_idx",
+          "columns": [
+            "utm_source"
+          ],
+          "isUnique": false
+        },
+        "pre_registrations_utm_campaign_idx": {
+          "name": "pre_registrations_utm_campaign_idx",
+          "columns": [
+            "utm_campaign"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "pre_registrations_device_interest_check": {
+          "name": "pre_registrations_device_interest_check",
+          "value": "\"pre_registrations\".\"device_interest\" in ('android', 'ios', 'both', 'other')"
+        },
+        "pre_registrations_status_check": {
+          "name": "pre_registrations_status_check",
+          "value": "\"pre_registrations\".\"status\" in ('active', 'inactive')"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

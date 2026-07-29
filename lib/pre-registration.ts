@@ -1,5 +1,6 @@
 export const BETA_GOAL = 10_000;
 export const CONSENT_VERSION = "pre-register-v1";
+export const PRIVACY_POLICY_VERSION = "2026-07-29";
 export const DEVICE_INTERESTS = ["android", "ios", "both", "other"] as const;
 
 export type DeviceInterest = (typeof DEVICE_INTERESTS)[number];
@@ -8,7 +9,7 @@ export type RegistrationInput = {
   firstName: string | null;
   email: string;
   deviceInterest: DeviceInterest;
-  consent: true;
+  consentGiven: true;
   turnstileToken: string;
   honeypot: string;
   utmSource: string | null;
@@ -55,8 +56,8 @@ export function validateRegistrationPayload(payload: unknown): ValidationResult 
     return { ok: false, field: "deviceInterest", error: "Choose a device." };
   }
 
-  if (input.consent !== true) {
-    return { ok: false, field: "consent", error: "Consent is required." };
+  if (input.consentGiven !== true) {
+    return { ok: false, field: "consentGiven", error: "Consent is required." };
   }
 
   const turnstileToken =
@@ -76,7 +77,7 @@ export function validateRegistrationPayload(payload: unknown): ValidationResult 
       firstName: rawFirstName || null,
       email,
       deviceInterest: input.deviceInterest as DeviceInterest,
-      consent: true,
+      consentGiven: true,
       turnstileToken,
       honeypot,
       utmSource: cleanOptional(input.utmSource, 120),
@@ -114,10 +115,10 @@ export async function savePreRegistration(
 ) {
   const result = await database.prepare(
     `INSERT INTO pre_registrations (
-      id, email, first_name, device_interest, consent_version, consent_at,
-      created_at, utm_source, utm_medium, utm_campaign, utm_content, utm_term,
-      landing_path, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+      id, email, first_name, device_interest, consent_version, consent_given,
+      consent_at, privacy_policy_version, created_at, utm_source, utm_medium,
+      utm_campaign, utm_content, utm_term, landing_path, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
     ON CONFLICT(email) DO NOTHING`,
   )
     .bind(
@@ -126,7 +127,9 @@ export async function savePreRegistration(
       data.firstName,
       data.deviceInterest,
       CONSENT_VERSION,
+      data.consentGiven,
       now,
+      PRIVACY_POLICY_VERSION,
       now,
       data.utmSource,
       data.utmMedium,

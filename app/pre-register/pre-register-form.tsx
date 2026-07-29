@@ -40,7 +40,7 @@ export default function PreRegisterForm() {
   const [successTitle, setSuccessTitle] = useState("You're on the list!");
   const [turnstileToken, setTurnstileToken] = useState("");
   const turnstileContainer = useRef<HTMLDivElement>(null);
-  const turnstileWidgetId = useRef<string>();
+  const turnstileWidgetId = useRef<string | undefined>(undefined);
 
   const loadProgress = useCallback(async () => {
     try {
@@ -116,7 +116,7 @@ export default function PreRegisterForm() {
     const email = String(formData.get("email") ?? "").trim().toLowerCase();
     const firstName = String(formData.get("firstName") ?? "").trim();
     const deviceInterest = String(formData.get("deviceInterest") ?? "");
-    const consent = formData.get("consent") === "on";
+    const consentGiven = formData.get("consentGiven") === "on";
     const nextErrors: Record<string, string> = {};
 
     if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email) || email.length > 254) {
@@ -128,7 +128,7 @@ export default function PreRegisterForm() {
     if (!deviceOptions.some(([value]) => value === deviceInterest)) {
       nextErrors.deviceInterest = "Choose a device.";
     }
-    if (!consent) nextErrors.consent = "Consent is required.";
+    if (!consentGiven) nextErrors.consentGiven = "Consent is required.";
     if (!turnstileToken) nextErrors.turnstile = "Complete the security check.";
 
     setErrors(nextErrors);
@@ -145,7 +145,7 @@ export default function PreRegisterForm() {
           firstName,
           email,
           deviceInterest,
-          consent,
+          consentGiven,
           website: String(formData.get("website") ?? ""),
           turnstileToken,
           utmSource: query.get("utm_source"),
@@ -305,14 +305,18 @@ export default function PreRegisterForm() {
               <label className="pre-register-consent">
                 <input
                   type="checkbox"
-                  name="consent"
+                  name="consentGiven"
                   required
-                  aria-invalid={Boolean(errors.consent)}
-                  aria-describedby={errors.consent ? "consent-error" : undefined}
+                  aria-invalid={Boolean(errors.consentGiven)}
+                  aria-describedby={errors.consentGiven ? "consent-error" : undefined}
                 />
-                <span>I agree to receive an email when Gubify becomes available.</span>
+                <span>
+                  I have read the <Link href="/privacy">Privacy Policy</Link> and
+                  consent to the processing of my personal data for managing my
+                  pre-registration and sending the Gubify launch notification.
+                </span>
               </label>
-              {errors.consent && <small className="pre-register-error" id="consent-error">{errors.consent}</small>}
+              {errors.consentGiven && <small className="pre-register-error" id="consent-error">{errors.consentGiven}</small>}
 
               <div className="turnstile-field">
                 {siteKey ? (
@@ -335,9 +339,8 @@ export default function PreRegisterForm() {
                 your address at any time.
               </p>
               <p className="pre-register-privacy">
-                We use the information you submit only to record your
-                pre-registration, understand platform interest and notify you
-                when Gubify becomes available.
+                See the <Link href="/privacy">Privacy Policy</Link> for details
+                about data use, retention and your rights.
               </p>
             </form>
           </>

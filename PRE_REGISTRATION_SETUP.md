@@ -42,6 +42,13 @@ For a local D1 instance:
 npx wrangler d1 execute gubify-pre-registrations --local --file=drizzle/0000_cuddly_wither.sql
 ```
 
+If the initial migration has already been applied, add the privacy consent
+columns with the incremental migration:
+
+```bash
+npx wrangler d1 execute gubify-pre-registrations --remote --file=drizzle/0001_polite_wallop.sql
+```
+
 ## Configure hosted values
 
 Add `NEXT_PUBLIC_TURNSTILE_SITE_KEY` as a build-time public environment value
