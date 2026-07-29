@@ -26,11 +26,6 @@ const workerConfig = {
         },
       ]
     : [],
-  env: {
-    production: {
-      d1_databases: [countDatabase],
-    },
-  },
 };
 
 export default defineConfig(async () => {

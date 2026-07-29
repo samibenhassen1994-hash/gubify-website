@@ -21,7 +21,11 @@ test("generated deploy config preserves the COUNT D1 binding", async () => {
   };
 
   assert.deepEqual(config.d1_databases, [expected]);
-  assert.deepEqual(config.env.production.d1_databases, [expected]);
+  assert.equal(
+    Object.hasOwn(config, "env"),
+    false,
+    "redirected Wrangler configuration must not contain env",
+  );
 });
 
 test("renders development preview metadata", async () => {
