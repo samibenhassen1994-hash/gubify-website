@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
+import FeatureGallery from "./feature-gallery";
 import PreRegisterForm from "./pre-register-form";
 import LegalFooter from "../legal-footer";
 
@@ -59,16 +59,7 @@ export default function PreRegisterPage() {
               <h2 id="showcase-title">See what you can do with Gubify</h2>
               <p>From everyday messages to shared interests and trusted answers, Gubify helps groups move forward together.</p>
             </div>
-            <figure>
-              <Image
-                src="/gubify-feature-showcase.png"
-                width="1536"
-                height="1024"
-                alt="Gubify app screens showing a message converted into an action, interest-based communities, and levels earned by helping others"
-                priority
-                unoptimized
-              />
-            </figure>
+            <FeatureGallery />
             <div className="pre-register-value-strip" aria-label="Gubify key benefits">
               <article>
                 <span aria-hidden="true">01</span>

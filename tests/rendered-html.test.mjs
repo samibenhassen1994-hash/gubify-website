@@ -97,6 +97,25 @@ test("renders the pre-registration page and form", async () => {
     html,
     /<img(?=[^>]*\bsrc=["']\/gubify-feature-showcase\.png["'])(?=[^>]*\balt=["'][^"']*message converted into an action[^"']*["'])[^>]*>/i,
   );
+  assert.match(html, /View features/i);
+  assert.match(html, /role=["']dialog["']/i);
+  assert.match(html, /aria-modal=["']true["']/i);
+  assert.match(html, /aria-live=["']polite["']>1.*\/.*3<\/span>/i);
+  assert.match(html, /aria-label=["']Previous feature["']/i);
+  assert.match(html, /aria-label=["']Next feature["']/i);
+  assert.match(html, /aria-label=["']Close feature gallery["']/i);
+  assert.match(
+    html,
+    /Gubify feature showing how a chat message can be converted into a task, event, shared budget or group goal\./i,
+  );
+  assert.match(
+    html,
+    /Gubify feature showing communities based on interests such as travel, sports, food, music, gaming and technology\./i,
+  );
+  assert.match(
+    html,
+    /Gubify feature showing the request and level system where users earn experience when their answer is selected as the best\./i,
+  );
   assert.match(html, /Get your launch notification/i);
   assert.match(html, /Which device would you use Gubify on/i);
   assert.match(
