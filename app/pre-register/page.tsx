@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import PreRegisterForm from "./pre-register-form";
 import LegalFooter from "../legal-footer";
@@ -38,33 +39,54 @@ export default function PreRegisterPage() {
 
       <section className="pre-register-hero" id="pre-register-main">
         <div className="pre-register-intro">
-          <span className="eyebrow">Pre-register for Gubify</span>
-          <p className="pre-register-display-label">PRE-REGISTER</p>
-          <h1>Be among the first to use Gubify.</h1>
+          <span className="eyebrow">Gubify early access</span>
+          <p className="pre-register-display-label">PRE-REGISTER · BETA GOAL</p>
+          <h1>Turn group conversations into real action.</h1>
           <p className="pre-register-description">
-            Gubify turns group conversations into tasks, events, proposals,
-            shared budgets and real plans. Pre-register now and we&apos;ll
-            notify you when the app is ready.
+            Organize what matters, find communities built around your interests,
+            and grow by helping others — all in one connected group experience.
           </p>
-          <div className="pre-register-callout">
-            <span className="pre-register-callout-mark" aria-hidden="true">G</span>
-            <strong>One group. One chat. Everything your group needs to move forward.</strong>
+          <div className="pre-register-hero-actions">
+            <a className="pre-register-primary-cta" href="#pre-register-form">
+              Join the beta goal <span aria-hidden="true">↓</span>
+            </a>
+            <span>Launch notification only. No spam.</span>
           </div>
-          <div className="pre-register-visual" aria-label="Gubify launch notification preview">
-            <span className="pre-register-orbit pre-register-orbit-one" aria-hidden="true" />
-            <span className="pre-register-orbit pre-register-orbit-two" aria-hidden="true" />
-            <div className="launch-notification-card">
-              <span className="launch-notification-icon" aria-hidden="true">G</span>
-              <div>
-                <small>Gubify launch notification</small>
-                <strong>Your group&apos;s next chapter starts here.</strong>
-              </div>
-              <span className="launch-notification-dot" aria-hidden="true" />
+
+          <section className="pre-register-showcase" aria-labelledby="showcase-title">
+            <div className="pre-register-showcase-heading">
+              <span>One app, more useful groups</span>
+              <h2 id="showcase-title">See what you can do with Gubify</h2>
+              <p>From everyday messages to shared interests and trusted answers, Gubify helps groups move forward together.</p>
             </div>
-            <div className="launch-people" aria-hidden="true">
-              <span>A</span><span>M</span><span>J</span><span>+</span>
+            <figure>
+              <Image
+                src="/gubify-feature-showcase.png"
+                width="1536"
+                height="1024"
+                alt="Gubify app screens showing a message converted into an action, interest-based communities, and levels earned by helping others"
+                priority
+                unoptimized
+              />
+            </figure>
+            <div className="pre-register-value-strip" aria-label="Gubify key benefits">
+              <article>
+                <span aria-hidden="true">01</span>
+                <h3>Make chats actionable</h3>
+                <p>Turn the right message into a clear next step.</p>
+              </article>
+              <article>
+                <span aria-hidden="true">02</span>
+                <h3>Find your people</h3>
+                <p>Join communities shaped around what you love.</p>
+              </article>
+              <article>
+                <span aria-hidden="true">03</span>
+                <h3>Grow by contributing</h3>
+                <p>Help others, share useful answers and level up.</p>
+              </article>
             </div>
-          </div>
+          </section>
         </div>
 
         <PreRegisterForm />

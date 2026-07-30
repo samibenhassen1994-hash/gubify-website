@@ -91,7 +91,12 @@ test("renders the pre-registration page and form", async () => {
   const html = await response.text();
 
   assert.equal(response.status, 200);
-  assert.match(html, /Be among the first to use Gubify/i);
+  assert.match(html, /Turn group conversations into real action/i);
+  assert.match(html, /See what you can do with Gubify/i);
+  assert.match(
+    html,
+    /<img(?=[^>]*\bsrc=["']\/gubify-feature-showcase\.png["'])(?=[^>]*\balt=["'][^"']*message converted into an action[^"']*["'])[^>]*>/i,
+  );
   assert.match(html, /Get your launch notification/i);
   assert.match(html, /Which device would you use Gubify on/i);
   assert.match(

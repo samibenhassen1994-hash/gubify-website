@@ -225,7 +225,7 @@ export default function PreRegisterForm() {
         )}
       </section>
 
-      <section className="pre-register-form-card" aria-labelledby="form-title">
+      <section className="pre-register-form-card" id="pre-register-form" aria-labelledby="form-title">
         {status === "success" ? (
           <div className="pre-register-success" role="status" aria-live="polite">
             <span aria-hidden="true">✓</span>
