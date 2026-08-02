@@ -274,7 +274,7 @@ test("home renders accessible desktop and mobile navigation", async () => {
   );
   assert.match(
     html,
-    /<nav(?=[^>]*id=["']mobile-navigation["'])(?=[^>]*aria-label=["']Mobile navigation["'])[^>]*>[\s\S]*?href=["']\/support["'][^>]*>Contact Us<\/a>[\s\S]*?href=["']\/pre-register["'][^>]*>Pre-register<\/a>[\s\S]*?href=["']\/privacy["'][^>]*>Privacy Policy<\/a>[\s\S]*?href=["']\/terms["'][^>]*>Terms of Service<\/a>[\s\S]*?<\/nav>/i,
+    /<div(?=[^>]*id=["']mobile-navigation["'])(?=[^>]*role=["']dialog["'])(?=[^>]*aria-modal=["']true["'])(?=[^>]*aria-label=["']Mobile navigation["'])[^>]*>[\s\S]*?aria-label=["']Close navigation menu["'][\s\S]*?href=["']\/support["'][^>]*>Contact Us<\/a>[\s\S]*?href=["']\/pre-register["'][^>]*>Pre-register<\/a>[\s\S]*?href=["']\/privacy["'][^>]*>Privacy Policy<\/a>[\s\S]*?href=["']\/terms["'][^>]*>Terms of Service<\/a>[\s\S]*?<\/div>/i,
   );
 });
 
