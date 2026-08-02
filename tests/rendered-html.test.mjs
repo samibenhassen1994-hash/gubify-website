@@ -7,6 +7,7 @@ import {
   validateRegistrationPayload,
 } from "../lib/pre-registration.ts";
 import { fetchPreRegistrationProgress } from "../lib/pre-registration-count-client.ts";
+import { saveFeedback, validateFeedback } from "../lib/feedback.ts";
 
 const developmentPreviewMeta =
   /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
@@ -149,7 +150,7 @@ test("renders the privacy policy, support center and fundraising page", async ()
 
   assert.equal(privacyResponse.status, 200);
   assert.match(privacyHtml, /Privacy Policy and Personal Data Processing Notice/i);
-  assert.match(privacyHtml, /2026-07-29/);
+  assert.match(privacyHtml, /2026-08-02/);
   assert.equal(supportResponse.status, 200);
   assert.match(supportHtml, /Gubify Support Center/i);
   assert.match(supportHtml, /id=["']delete-pre-registration["']/i);
@@ -158,6 +159,89 @@ test("renders the privacy policy, support center and fundraising page", async ()
   assert.equal(fundraisingResponse.status, 200);
   assert.match(fundraisingHtml, /<h1[^>]*>Support Gubify<\/h1>/i);
   assert.match(fundraisingHtml, /https:\/\/gofund\.me\/8faaabb1c/i);
+});
+
+test("renders bug and feature feedback forms from shareable query parameters", async () => {
+  const worker = await loadWorker();
+  const bugResponse = await worker.fetch(new Request("http://localhost/feedback?type=bug", { headers: { accept: "text/html" } }), baseEnv, executionContext);
+  const featureResponse = await worker.fetch(new Request("http://localhost/feedback?type=feature", { headers: { accept: "text/html" } }), baseEnv, executionContext);
+  const bugHtml = await bugResponse.text();
+  const featureHtml = await featureResponse.text();
+  assert.equal(bugResponse.status, 200);
+  assert.equal(featureResponse.status, 200);
+  assert.match(bugHtml, /Help us improve Gubify/i);
+  assert.match(bugHtml, /role=["']tablist["']/i);
+  assert.match(bugHtml, /Problem title/i);
+  assert.match(bugHtml, /What happened\?/i);
+  assert.match(bugHtml, /<input(?=[^>]*name=["']title["'])(?=[^>]*required)[^>]*>/i);
+  assert.match(bugHtml, /<textarea(?=[^>]*name=["']description["'])(?=[^>]*required)[^>]*>/i);
+  assert.match(featureHtml, /Feature title/i);
+  assert.match(featureHtml, /Describe your idea/i);
+  assert.match(featureHtml, /Why would it be useful\?/i);
+  assert.match(featureHtml, /<textarea(?=[^>]*name=["']usefulness["'])(?=[^>]*required)[^>]*>/i);
+});
+
+test("support, terms and privacy expose the beta feedback resources", async () => {
+  const worker = await loadWorker();
+  const support = await (await worker.fetch(new Request("http://localhost/support", { headers: { accept: "text/html" } }), baseEnv, executionContext)).text();
+  const termsResponse = await worker.fetch(new Request("http://localhost/terms", { headers: { accept: "text/html" } }), baseEnv, executionContext);
+  const terms = await termsResponse.text();
+  const privacy = await (await worker.fetch(new Request("http://localhost/privacy", { headers: { accept: "text/html" } }), baseEnv, executionContext)).text();
+  assert.match(support, /Frequently asked questions/i);
+  assert.match(support, /href=["']\/feedback\?type=bug["']/i);
+  assert.match(support, /href=["']\/feedback\?type=feature["']/i);
+  assert.match(support, /href=["']\/terms["']/i);
+  assert.equal(termsResponse.status, 200);
+  assert.match(terms, /Gubify Website Terms of Service/i);
+  assert.match(privacy, /Feedback and diagnostic data/i);
+  assert.match(privacy, /24 months/i);
+});
+
+test("validates feedback types and required fields", () => {
+  assert.equal(validateFeedback({ type: "other" }).ok, false);
+  assert.equal(validateFeedback({ type: "bug", title: "Bug", description: "Details", turnstileToken: "token" }).ok, true);
+  assert.equal(validateFeedback({ type: "feature", title: "Idea", description: "Details", turnstileToken: "token" }).ok, false);
+  assert.equal(validateFeedback({ type: "feature", title: "Idea", description: "Details", usefulness: "It saves time", turnstileToken: "token" }).ok, true);
+});
+
+test("saves bug and feature feedback with prepared bindings", async () => {
+  const rows = [];
+  const database = { prepare(sql) { assert.match(sql, /INSERT INTO feedback_reports/); return { bind(...values) { rows.push(values); return { run: async () => ({ success: true }) }; } }; } };
+  for (const [type, usefulness] of [["bug", null], ["feature", "Useful"]]) {
+    const result = validateFeedback({ type, title: `${type} title`, description: "Description", usefulness, turnstileToken: "token" });
+    assert.equal(result.ok, true);
+    await saveFeedback(database, result.data, 100, `${type}-id`);
+  }
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0][1], "bug");
+  assert.equal(rows[1][1], "feature");
+  assert.equal(rows[0].at(-1), 100);
+});
+
+test("feedback endpoint rejects invalid requests and stores a valid report", async () => {
+  const worker = await loadWorker();
+  const getResponse = await worker.fetch(new Request("http://localhost/api/feedback"), baseEnv, executionContext);
+  assert.equal(getResponse.status, 405);
+  const invalidType = await worker.fetch(new Request("http://localhost/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "other" }) }), baseEnv, executionContext);
+  assert.equal(invalidType.status, 400);
+  const originalFetch = globalThis.fetch;
+  const inserts = [];
+  const database = { prepare(sql) { assert.match(sql, /INSERT INTO feedback_reports/); return { bind(...values) { inserts.push(values); return { run: async () => ({ success: true }) }; } }; } };
+  globalThis.__cloudflareTestEnv = { COUNT: database, TURNSTILE_SECRET_KEY: "secret" };
+  try {
+    globalThis.fetch = async () => Response.json({ success: false });
+    const rejected = await worker.fetch(new Request("http://localhost/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "bug", title: "Bug", description: "Details", turnstileToken: "bad" }) }), { ...baseEnv, COUNT: database, TURNSTILE_SECRET_KEY: "secret" }, executionContext);
+    assert.equal(rejected.status, 400);
+    globalThis.fetch = async () => Response.json({ success: true });
+    for (const payload of [
+      { type: "bug", title: "Bug", description: "Details", turnstileToken: "good" },
+      { type: "feature", title: "Idea", description: "Details", usefulness: "Useful", turnstileToken: "good" },
+    ]) {
+      const response = await worker.fetch(new Request("http://localhost/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }), { ...baseEnv, COUNT: database, TURNSTILE_SECRET_KEY: "secret" }, executionContext);
+      assert.equal(response.status, 200);
+    }
+    assert.equal(inserts.length, 2);
+  } finally { globalThis.fetch = originalFetch; delete globalThis.__cloudflareTestEnv; }
 });
 
 test("home links to the pre-registration page", async () => {

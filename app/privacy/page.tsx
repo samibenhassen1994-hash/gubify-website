@@ -5,12 +5,12 @@ import LegalFooter from "../legal-footer";
 export const metadata: Metadata = {
   title: "Privacy Policy and Personal Data Processing Notice | Gubify",
   description:
-    "Learn how Gubify processes personal data submitted through its website and pre-registration form.",
+    "Learn how Gubify processes personal data submitted through its pre-registration and feedback forms.",
   alternates: { canonical: "/privacy" },
   openGraph: {
     title: "Privacy Policy and Personal Data Processing Notice | Gubify",
     description:
-      "Learn how Gubify processes personal data submitted through its website and pre-registration form.",
+      "Learn how Gubify processes personal data submitted through its pre-registration and feedback forms.",
     url: "https://gubify.com/privacy",
     siteName: "Gubify",
     type: "website",
@@ -22,6 +22,7 @@ const contents = [
   ["controller", "Data controller"],
   ["data-collected", "Personal data collected"],
   ["purposes", "Purposes of processing"],
+  ["feedback", "Feedback and diagnostic data"],
   ["legal-basis", "Legal basis"],
   ["security", "Processing methods and security"],
   ["retention", "Data retention"],
@@ -64,8 +65,8 @@ export default function PrivacyPage() {
           website and pre-registration form, why it is used and what choices you have.
         </p>
         <div className="legal-meta">
-          <span><strong>Last updated</strong> July 29, 2026</span>
-          <span><strong>Policy version</strong> 2026-07-29</span>
+          <span><strong>Last updated</strong> August 2, 2026</span>
+          <span><strong>Policy version</strong> 2026-08-02</span>
         </div>
       </section>
 
@@ -88,7 +89,7 @@ export default function PrivacyPage() {
             </p>
             <p>
               This notice applies to gubify.com and, in particular, to the
-              Gubify pre-registration form.
+              Gubify pre-registration and feedback forms.
             </p>
           </section>
 
@@ -138,6 +139,14 @@ export default function PrivacyPage() {
             </p>
           </section>
 
+          <section id="feedback">
+            <h2>4A. Feedback and diagnostic data</h2>
+            <p>When you submit a bug report or feature suggestion, Gubify processes the content you provide and may process limited technical information such as app version, platform, operating system, browser name and version, language, timezone, viewport size, page URL, source page and report origin.</p>
+            <p>A contact email is optional and is used only to clarify or follow up on that submission. Feedback does not add you to marketing, a newsletter or pre-registration.</p>
+            <p>These data are used for support, diagnosis, product improvement, beta management and abuse prevention. No persistent device identifier is created, no device fingerprinting is used, and the complete raw user-agent string is not stored.</p>
+            <p>Feedback reports and related technical data may be retained for the time necessary to investigate, resolve and document the issue or evaluate the suggestion, and ordinarily for no longer than 24 months, unless a longer period is required for legal, security or dispute-related reasons.</p>
+          </section>
+
           <section id="legal-basis">
             <h2>5. Legal basis</h2>
             <ul>
@@ -182,7 +191,7 @@ export default function PrivacyPage() {
           <section id="turnstile">
             <h2>9. Cloudflare Turnstile</h2>
             <p>
-              Turnstile protects the pre-registration form from bots and abuse.
+              Turnstile protects the pre-registration and feedback forms from bots and abuse.
               Cloudflare may process technical information concerning the browser,
               device, network and interaction with the security check.
             </p>
@@ -269,8 +278,8 @@ export default function PrivacyPage() {
           </section>
 
           <div className="legal-version">
-            <p><strong>Last updated:</strong> July 29, 2026</p>
-            <p><strong>Privacy policy version:</strong> 2026-07-29</p>
+            <p><strong>Last updated:</strong> August 2, 2026</p>
+            <p><strong>Privacy policy version:</strong> 2026-08-02</p>
           </div>
         </article>
       </div>

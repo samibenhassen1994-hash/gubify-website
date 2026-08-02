@@ -15,6 +15,13 @@
       "when": 1785331465658,
       "tag": "0001_polite_wallop",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785665859640,
+      "tag": "0002_brave_nightshade",
+      "breakpoints": true
     }
   ]
 }
