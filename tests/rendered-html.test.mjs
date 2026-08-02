@@ -8,6 +8,12 @@ import {
 } from "../lib/pre-registration.ts";
 import { fetchPreRegistrationProgress } from "../lib/pre-registration-count-client.ts";
 import { saveFeedback, validateFeedback } from "../lib/feedback.ts";
+import {
+  buildAndroidInviteIntent,
+  buildInviteHttpsUrl,
+  copyInviteCode,
+  parseInviteCode,
+} from "../lib/invite-code.ts";
 
 const developmentPreviewMeta =
   /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
@@ -276,6 +282,116 @@ test("home renders accessible desktop and mobile navigation", async () => {
     html,
     /<div(?=[^>]*id=["']mobile-navigation["'])(?=[^>]*role=["']dialog["'])(?=[^>]*aria-modal=["']true["'])(?=[^>]*aria-label=["']Mobile navigation["'])[^>]*>[\s\S]*?aria-label=["']Close navigation menu["'][\s\S]*?href=["']\/support["'][^>]*>Contact Us<\/a>[\s\S]*?href=["']\/pre-register["'][^>]*>Pre-register<\/a>[\s\S]*?href=["']\/privacy["'][^>]*>Privacy Policy<\/a>[\s\S]*?href=["']\/terms["'][^>]*>Terms of Service<\/a>[\s\S]*?<\/div>/i,
   );
+});
+
+test("parses and formats private invite codes with the app alphabet", () => {
+  assert.deepEqual(parseInviteCode("K7M4-P9Q2"), {
+    canonical: "K7M4P9Q2",
+    visible: "K7M4-P9Q2",
+  });
+  assert.deepEqual(parseInviteCode("k7m4p9q2"), {
+    canonical: "K7M4P9Q2",
+    visible: "K7M4-P9Q2",
+  });
+
+  for (const invalid of [
+    "I7M4-P9Q2",
+    "O7M4-P9Q2",
+    "07M4-P9Q2",
+    "17M4-P9Q2",
+    "K7-M4P9Q2",
+    "K7M4P-9Q2",
+    "K7M4--P9Q2",
+    "K7M4P9Q",
+    "K7M4P9Q22",
+    " K7M4P9Q2",
+    "K7M4P9Q2 ",
+    "K7M4 P9Q2",
+    "K7M4/P9Q2",
+    "K7M4_P9Q2",
+    "K7M4-P9Qé",
+    "Ｋ7M4-P9Q2",
+  ]) {
+    assert.equal(parseInviteCode(invalid), null, `expected ${JSON.stringify(invalid)} to be rejected`);
+  }
+});
+
+test("builds invite links only for the official host and Android package", () => {
+  const code = parseInviteCode("K7M4-P9Q2");
+  assert.ok(code);
+  assert.equal(buildInviteHttpsUrl(code), "https://gubify.com/join/K7M4-P9Q2");
+  assert.equal(
+    buildAndroidInviteIntent(code),
+    "intent://gubify.com/join/K7M4-P9Q2#Intent;scheme=https;package=com.gubify.app;S.browser_fallback_url=https%3A%2F%2Fgubify.com%2Fpre-register;end",
+  );
+});
+
+test("copies an invite code with Clipboard API or the local fallback", async () => {
+  const clipboardValues = [];
+  assert.equal(
+    await copyInviteCode("K7M4-P9Q2", { writeText: async (value) => clipboardValues.push(value) }, () => false),
+    true,
+  );
+  assert.deepEqual(clipboardValues, ["K7M4-P9Q2"]);
+
+  let fallbackValue = "";
+  assert.equal(
+    await copyInviteCode("K7M4-P9Q2", undefined, (value) => {
+      fallbackValue = value;
+      return true;
+    }),
+    true,
+  );
+  assert.equal(fallbackValue, "K7M4-P9Q2");
+});
+
+test("renders private invitation pages without checking invitation data", async () => {
+  const worker = await loadWorker();
+  const originalFetch = globalThis.fetch;
+  const externalRequests = [];
+  globalThis.fetch = async (input) => {
+    externalRequests.push(String(input));
+    throw new Error("Invitation pages must not make external requests");
+  };
+
+  try {
+    const validResponse = await worker.fetch(
+      new Request("http://localhost/join/k7m4-p9q2?ignored=I0O1#fragment", { headers: { accept: "text/html" } }),
+      baseEnv,
+      executionContext,
+    );
+    const invalidResponse = await worker.fetch(
+      new Request("http://localhost/join/IO01-ABCD", { headers: { accept: "text/html" } }),
+      baseEnv,
+      executionContext,
+    );
+    const validHtml = await validResponse.text();
+    const invalidHtml = await invalidResponse.text();
+
+    assert.equal(validResponse.status, 200);
+    assert.match(validHtml, /You’ve been invited to join a private Gub/i);
+    assert.match(validHtml, /K7M4-P9Q2/);
+    const visibleInviteContent = validHtml.match(
+      /<main class="join-page">[\s\S]*?<\/main>/,
+    )?.[0];
+    assert.ok(visibleInviteContent);
+    assert.doesNotMatch(visibleInviteContent, /I0O1/);
+    assert.match(validHtml, /Open Gubify/i);
+    assert.match(validHtml, /href=["']\/pre-register["']/i);
+    assert.match(validHtml, /Get notified when Gubify is available/i);
+    assert.match(validHtml, /name=["']robots["'][^>]*content=["'][^"']*noindex[^"']*nofollow/i);
+    assert.match(validHtml, /name=["']referrer["'][^>]*content=["']no-referrer["']/i);
+    assert.doesNotMatch(validHtml, /play\.google\.com|apps\.apple\.com/i);
+    assert.doesNotMatch(validHtml, /Gub name|member count|members:|inviter|Firebase|Firestore/i);
+
+    assert.equal(invalidResponse.status, 200);
+    assert.match(invalidHtml, /This invitation link can’t be used/i);
+    assert.match(invalidHtml, /href=["']\/["']/i);
+    assert.doesNotMatch(invalidHtml, /Open Gubify|Copy code|expired|does not exist/i);
+    assert.deepEqual(externalRequests, []);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("normalizes and validates registration data including UTM values", () => {
