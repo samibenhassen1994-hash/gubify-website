@@ -6,6 +6,7 @@ import {
   savePreRegistration,
   validateRegistrationPayload,
 } from "../lib/pre-registration.ts";
+import { fetchPreRegistrationProgress } from "../lib/pre-registration-count-client.ts";
 
 const developmentPreviewMeta =
   /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
@@ -251,6 +252,31 @@ test("duplicate registrations remain successful without a second insert", async 
   assert.equal(boundValues.length, 2);
 });
 
+test("count client uses normal loading initially and bypasses cache after signup", async () => {
+  const calls = [];
+  const fetcher = async (input, init) => {
+    calls.push({ input, init });
+    return Response.json({
+      count: 7,
+      goal: 10000,
+      remaining: 9993,
+      percentage: 0.07,
+      goalReached: false,
+    });
+  };
+
+  assert.equal((await fetchPreRegistrationProgress({ fetcher })).count, 7);
+  assert.equal((await fetchPreRegistrationProgress({
+    fresh: true,
+    fetcher,
+    now: () => 12345,
+  })).count, 7);
+  assert.equal(calls[0].input, "/api/pre-register/count");
+  assert.equal(calls[0].init.cache, undefined);
+  assert.equal(calls[1].input, "/api/pre-register/count?refresh=12345");
+  assert.equal(calls[1].init.cache, "no-store");
+});
+
 test("valid registration passes Turnstile and is saved", async () => {
   const worker = await loadWorker();
   const originalFetch = globalThis.fetch;
@@ -367,6 +393,7 @@ test("public count endpoint returns active aggregate data only", async () => {
   const data = await response.json();
 
   assert.equal(response.status, 200);
+  assert.equal(response.headers.get("Cache-Control"), "no-store");
   assert.deepEqual(data, {
     count: 42,
     goal: 10000,
@@ -382,4 +409,79 @@ test("public count endpoint returns active aggregate data only", async () => {
     "remaining",
   ]);
   delete globalThis.__cloudflareTestEnv;
+});
+
+test("successful and duplicate signups refresh the authoritative count", async () => {
+  const worker = await loadWorker();
+  const originalFetch = globalThis.fetch;
+  let changes = 1;
+  let count = 10;
+  const database = {
+    prepare(sql) {
+      if (/^SELECT COUNT/.test(sql)) {
+        return {
+          bind(status) {
+            assert.equal(status, "active");
+            return { first: async () => ({ count }) };
+          },
+        };
+      }
+      return {
+        bind() {
+          return {
+            run: async () => {
+              if (changes === 1) count += 1;
+              return { meta: { changes } };
+            },
+          };
+        },
+      };
+    },
+  };
+  globalThis.__cloudflareTestEnv = {
+    COUNT: database,
+    TURNSTILE_SECRET_KEY: "server-secret",
+  };
+  globalThis.fetch = async () => Response.json({ success: true });
+
+  const submit = () => worker.fetch(
+    new Request("http://localhost/api/pre-register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "refresh@example.com",
+        deviceInterest: "android",
+        consentGiven: true,
+        turnstileToken: "valid-token",
+        website: "",
+      }),
+    }),
+    { ...baseEnv, COUNT: database, TURNSTILE_SECRET_KEY: "server-secret" },
+    executionContext,
+  );
+  const readCount = async () => {
+    const response = await worker.fetch(
+      new Request(`http://localhost/api/pre-register/count?refresh=${Date.now()}`, {
+        headers: { "Cache-Control": "no-cache" },
+      }),
+      { ...baseEnv, COUNT: database },
+      executionContext,
+    );
+    return response.json();
+  };
+
+  try {
+    const createdResult = await (await submit()).json();
+    assert.equal(createdResult.alreadyRegistered, false);
+    assert.equal((await readCount()).count, 11);
+
+    changes = 0;
+    count = 12;
+    const duplicateResult = await (await submit()).json();
+    assert.equal(duplicateResult.alreadyRegistered, true);
+    assert.equal((await readCount()).count, 12);
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete globalThis.__cloudflareTestEnv;
+  }
 });

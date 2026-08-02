@@ -2,14 +2,10 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-
-type Progress = {
-  count: number;
-  goal: number;
-  remaining: number;
-  percentage: number;
-  goalReached: boolean;
-};
+import {
+  fetchPreRegistrationProgress,
+  type PreRegistrationProgress,
+} from "@/lib/pre-registration-count-client";
 
 type TurnstileApi = {
   render(container: HTMLElement, options: Record<string, unknown>): string;
@@ -33,7 +29,7 @@ const initialErrors: Record<string, string> = {};
 
 export default function PreRegisterForm() {
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
-  const [progress, setProgress] = useState<Progress | null>(null);
+  const [progress, setProgress] = useState<PreRegistrationProgress | null>(null);
   const [counterError, setCounterError] = useState("");
   const [errors, setErrors] = useState(initialErrors);
   const [status, setStatus] = useState<"idle" | "submitting" | "success">("idle");
@@ -42,13 +38,9 @@ export default function PreRegisterForm() {
   const turnstileContainer = useRef<HTMLDivElement>(null);
   const turnstileWidgetId = useRef<string | undefined>(undefined);
 
-  const loadProgress = useCallback(async () => {
+  const loadProgress = useCallback(async (fresh = false) => {
     try {
-      const response = await fetch("/api/pre-register/count", {
-        headers: { accept: "application/json" },
-      });
-      if (!response.ok) throw new Error("Counter unavailable");
-      const data = (await response.json()) as Progress;
+      const data = await fetchPreRegistrationProgress({ fresh });
       setProgress(data);
       setCounterError("");
     } catch {
@@ -175,7 +167,7 @@ export default function PreRegisterForm() {
 
       setSuccessTitle(result.message ?? "You're on the list!");
       setStatus("success");
-      await loadProgress();
+      await loadProgress(true);
     } catch {
       setErrors({ form: "Something went wrong. Please try again." });
       setStatus("idle");

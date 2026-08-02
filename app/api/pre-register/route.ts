@@ -70,7 +70,9 @@ export async function POST(request: Request) {
       Date.now(),
       crypto.randomUUID(),
     );
-    if (created) clearProgressCache();
+    // A successful duplicate must also refresh the authoritative total in case
+    // another registration changed D1 while this isolate held a cached count.
+    clearProgressCache();
 
     return Response.json({
       ok: true,

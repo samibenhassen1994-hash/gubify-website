@@ -8,12 +8,15 @@ type RuntimeEnv = {
   COUNT?: D1Database;
 };
 
-export async function GET() {
+const countResponseHeaders = { "Cache-Control": "no-store" };
+
+export async function GET(request: Request) {
   try {
-    const cached = readCachedProgress();
+    const forceRefresh = new URL(request.url).searchParams.has("refresh");
+    const cached = forceRefresh ? null : readCachedProgress();
     if (cached) {
       return Response.json(cached, {
-        headers: { "Cache-Control": "public, max-age=30, stale-while-revalidate=30" },
+        headers: countResponseHeaders,
       });
     }
 
@@ -28,7 +31,7 @@ export async function GET() {
 
     const progress = writeCachedProgress(Number(row?.count ?? 0));
     return Response.json(progress, {
-      headers: { "Cache-Control": "public, max-age=30, stale-while-revalidate=30" },
+      headers: countResponseHeaders,
     });
   } catch {
     return Response.json(
