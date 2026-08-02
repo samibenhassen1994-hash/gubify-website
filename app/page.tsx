@@ -177,6 +177,7 @@ export default function Home() {
           <a href="#how-it-works">How it works</a>
           <a href="#communities">Communities</a>
           <a href="/fundraising">Support us</a>
+          <a href="/support">Contact Us</a>
           <a href="#about">About</a>
         </nav>
 
@@ -193,6 +194,10 @@ export default function Home() {
         <a href="#about">
           <span className="quick-link-icon" aria-hidden="true">i</span>
           Why Gubify?
+        </a>
+        <a href="/support">
+          <span className="quick-link-icon" aria-hidden="true">@</span>
+          Contact Us
         </a>
       </nav>
 
