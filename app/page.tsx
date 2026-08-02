@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import LegalFooter from "./legal-footer";
+import SiteHeader from "./site-header";
 
 const launchDate = new Date("2026-09-15T18:00:00+02:00");
 const initialCountdown = {
@@ -164,42 +165,7 @@ export default function Home() {
         </div>
       </aside>
 
-      <header className="site-header">
-        <a className="brand" href="#top" aria-label="Gubify home">
-          <span className="brand-mark" aria-hidden="true">
-            G
-          </span>
-          <span>Gubify</span>
-        </a>
-
-        <nav className="main-nav" aria-label="Main navigation">
-          <a href="#features">Features</a>
-          <a href="#how-it-works">How it works</a>
-          <a href="#communities">Communities</a>
-          <a href="/fundraising">Support us</a>
-          <a href="/support">Contact Us</a>
-          <a href="#about">About</a>
-        </nav>
-
-        <a className="header-cta" href="#coming-soon">
-          Get the app
-        </a>
-      </header>
-
-      <nav className="mobile-quick-links" aria-label="Quick page links">
-        <a href="#how-it-works">
-          <span className="quick-link-icon" aria-hidden="true">→</span>
-          How Gubify works
-        </a>
-        <a href="#about">
-          <span className="quick-link-icon" aria-hidden="true">i</span>
-          Why Gubify?
-        </a>
-        <a href="/support">
-          <span className="quick-link-icon" aria-hidden="true">@</span>
-          Contact Us
-        </a>
-      </nav>
+      <SiteHeader />
 
       <a className="mobile-support-fab" href="/fundraising" aria-label="Support Gubify">
         <span aria-hidden="true">♥</span>

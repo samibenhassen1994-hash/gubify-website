@@ -249,6 +249,12 @@ a {
   left: 0;
 }
 
+.mobile-menu-button,
+.mobile-navigation,
+.mobile-nav-backdrop {
+  display: none;
+}
+
 .header-cta {
   justify-self: end;
   border-radius: 16px;
@@ -1568,6 +1574,31 @@ footer > span {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes mobile-menu-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes mobile-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.mobile-navigation[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-menu-button span {
+    transition: none;
+  }
+
+  .mobile-navigation,
+  .mobile-nav-backdrop {
+    animation: none;
+  }
+}
+
 @media (max-width: 1180px) {
   .site-header {
     width: min(100% - 40px, 1040px);
@@ -1621,11 +1652,120 @@ footer > span {
 
   .site-header {
     inset: 104px 0 auto;
+    z-index: 110;
     grid-template-columns: 1fr auto;
   }
 
   .main-nav {
     display: none;
+  }
+
+  .header-cta {
+    display: none;
+  }
+
+  .mobile-menu-button {
+    display: grid;
+    width: 50px;
+    height: 50px;
+    place-content: center;
+    gap: 5px;
+    border: 1px solid #d7e3f2;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 10px 24px rgba(27, 61, 108, 0.14);
+    color: var(--navy);
+    cursor: pointer;
+  }
+
+  .mobile-menu-button span {
+    width: 22px;
+    height: 2px;
+    border-radius: 99px;
+    background: currentColor;
+    transition: transform 180ms ease, opacity 180ms ease;
+  }
+
+  .mobile-menu-button.is-open span:first-child {
+    transform: translateY(7px) rotate(45deg);
+  }
+
+  .mobile-menu-button.is-open span:nth-child(2) {
+    opacity: 0;
+  }
+
+  .mobile-menu-button.is-open span:last-child {
+    transform: translateY(-7px) rotate(-45deg);
+  }
+
+  .mobile-menu-button:hover,
+  .mobile-menu-button:focus-visible {
+    border-color: #94b8f6;
+    background: #f4f8ff;
+    outline: 3px solid rgba(36, 107, 253, 0.18);
+    outline-offset: 2px;
+  }
+
+  .mobile-navigation {
+    position: absolute;
+    top: 82px;
+    right: 0;
+    z-index: 2;
+    display: grid;
+    grid-column: 1 / -1;
+    justify-self: end;
+    width: min(360px, 100%);
+    max-height: calc(100vh - 220px);
+    gap: 4px;
+    overflow-y: auto;
+    border: 1px solid #dce6f4;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 24px 60px rgba(17, 43, 82, 0.24);
+    padding: 12px;
+    animation: mobile-menu-in 180ms ease both;
+    backdrop-filter: blur(18px);
+  }
+
+  .mobile-navigation a {
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    border-radius: 14px;
+    color: var(--navy);
+    padding: 0 16px;
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .mobile-navigation a:hover,
+  .mobile-navigation a:focus-visible {
+    background: #edf4ff;
+    color: var(--blue-deep);
+    outline: 2px solid rgba(36, 107, 253, 0.2);
+    outline-offset: -2px;
+  }
+
+  .mobile-navigation a[href="/pre-register"] {
+    margin-top: 5px;
+    background: var(--blue);
+    color: #fff;
+  }
+
+  .mobile-navigation a[href="/pre-register"]:hover,
+  .mobile-navigation a[href="/pre-register"]:focus-visible {
+    background: var(--blue-deep);
+  }
+
+  .mobile-nav-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: block;
+    border: 0;
+    background: rgba(9, 25, 52, 0.3);
+    cursor: default;
+    animation: mobile-backdrop-in 180ms ease both;
   }
 
   .hero {
@@ -1777,6 +1917,12 @@ footer > span {
     height: 78px;
     background: rgba(255, 255, 255, 0.94);
     backdrop-filter: blur(16px);
+  }
+
+  .mobile-navigation {
+    top: 236px;
+    width: min(360px, 100%);
+    max-height: calc(100vh - 252px);
   }
 
   .brand {

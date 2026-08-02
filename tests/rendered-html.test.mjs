@@ -254,6 +254,30 @@ test("home links to the pre-registration page", async () => {
   assert.match(await response.text(), /href=["']\/pre-register["']/i);
 });
 
+test("home renders accessible desktop and mobile navigation", async () => {
+  const worker = await loadWorker();
+  const response = await worker.fetch(
+    new Request("http://localhost/", { headers: { accept: "text/html" } }),
+    baseEnv,
+    executionContext,
+  );
+  const html = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(
+    html,
+    /<nav[^>]*aria-label=["']Main navigation["'][^>]*>[\s\S]*?href=["']\/support["'][^>]*>Contact Us<\/a>[\s\S]*?<\/nav>/i,
+  );
+  assert.match(
+    html,
+    /<button(?=[^>]*aria-label=["']Open navigation menu["'])(?=[^>]*aria-expanded=["']false["'])(?=[^>]*aria-controls=["']mobile-navigation["'])[^>]*>/i,
+  );
+  assert.match(
+    html,
+    /<nav(?=[^>]*id=["']mobile-navigation["'])(?=[^>]*aria-label=["']Mobile navigation["'])[^>]*>[\s\S]*?href=["']\/support["'][^>]*>Contact Us<\/a>[\s\S]*?href=["']\/pre-register["'][^>]*>Pre-register<\/a>[\s\S]*?href=["']\/privacy["'][^>]*>Privacy Policy<\/a>[\s\S]*?href=["']\/terms["'][^>]*>Terms of Service<\/a>[\s\S]*?<\/nav>/i,
+  );
+});
+
 test("normalizes and validates registration data including UTM values", () => {
   const result = validateRegistrationPayload({
     firstName: "  Sam  ",
