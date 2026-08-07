@@ -115,6 +115,39 @@ export default function GalleryContent() {
 
   return (
     <>
+      <section className={`${styles.section} ${styles.videoSection}`} aria-labelledby="gallery-videos-title">
+        <div className={styles.sectionHeading}>
+          <div>
+            <span className={styles.sectionKicker}>Videos</span>
+            <h2 id="gallery-videos-title">Watch Gubify work</h2>
+          </div>
+          <p>Short demos, hosted directly by Gubify.</p>
+        </div>
+
+        <div className={styles.videoGrid}>
+          {galleryVideos.map((video) => (
+            <article className={styles.videoCard} key={video.src}>
+              <div className={styles.videoShell}>
+                <video
+                  controls
+                  playsInline
+                  preload="metadata"
+                  poster={video.poster}
+                  aria-label={video.title}
+                >
+                  <source src={video.src} type="video/mp4" />
+                  Your browser does not support the video element.
+                </video>
+              </div>
+              <div className={styles.cardCopy}>
+                <h3>{video.title}</h3>
+                <p>{video.description}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <section className={styles.section} aria-labelledby="gallery-images-title">
         <div className={styles.sectionHeading}>
           <div>
@@ -149,39 +182,6 @@ export default function GalleryContent() {
               <div className={styles.cardCopy}>
                 <h3>{item.title}</h3>
                 <p>{item.description}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className={`${styles.section} ${styles.videoSection}`} aria-labelledby="gallery-videos-title">
-        <div className={styles.sectionHeading}>
-          <div>
-            <span className={styles.sectionKicker}>Videos</span>
-            <h2 id="gallery-videos-title">Watch Gubify work</h2>
-          </div>
-          <p>Short demos, hosted directly by Gubify.</p>
-        </div>
-
-        <div className={styles.videoGrid}>
-          {galleryVideos.map((video) => (
-            <article className={styles.videoCard} key={video.src}>
-              <div className={styles.videoShell}>
-                <video
-                  controls
-                  playsInline
-                  preload="metadata"
-                  poster={video.poster}
-                  aria-label={video.title}
-                >
-                  <source src={video.src} type="video/mp4" />
-                  Your browser does not support the video element.
-                </video>
-              </div>
-              <div className={styles.cardCopy}>
-                <h3>{video.title}</h3>
-                <p>{video.description}</p>
               </div>
             </article>
           ))}
