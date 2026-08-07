@@ -28,6 +28,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 0.9,
     },
+    { url: "https://gubify.com/gallery", lastModified: new Date("2026-08-07T00:00:00+02:00"), changeFrequency: "monthly", priority: 0.8 },
     { url: "https://gubify.com/feedback", lastModified: new Date("2026-08-02T00:00:00+02:00"), changeFrequency: "monthly", priority: 0.8 },
     { url: "https://gubify.com/terms", lastModified: new Date("2026-08-02T00:00:00+02:00"), changeFrequency: "monthly", priority: 0.6 },
     { url: "https://gubify.com/fundraising", lastModified, changeFrequency: "monthly", priority: 0.6 },
