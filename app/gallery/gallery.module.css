@@ -65,7 +65,7 @@
 }
 
 .videoSection {
-  padding-top: 54px;
+  padding-top: 18px;
 }
 
 .sectionHeading {
@@ -197,7 +197,7 @@
   position: relative;
   aspect-ratio: 9 / 16;
   overflow: hidden;
-  background: #eaf3ff;
+  background: #07183f;
 }
 
 .videoShell video {
@@ -206,6 +206,14 @@
   height: 100%;
   object-fit: cover;
   background: #07183f;
+}
+
+.videoShell video:fullscreen,
+.videoShell video:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  object-fit: contain;
+  background: #000;
 }
 
 .lightbox {
