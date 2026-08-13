@@ -3,6 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://gubify.com"),
+  applicationName: "Gubify",
   title: "Gubify — Turn every message into action",
   description:
     "Gubify transforms group chat messages into tasks, events, proposals, shared budgets and group goals.",
