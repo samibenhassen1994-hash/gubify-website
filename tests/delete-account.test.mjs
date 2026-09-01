@@ -77,8 +77,8 @@ test("stores a deletion request with pending notification status", async () => {
   assert.equal(rows.length, 1);
   assert.equal(rows[0][0], "request-id");
   assert.equal(rows[0][1], "user@example.com");
-  assert.equal(rows[0].at(-3), "new");
-  assert.equal(rows[0].at(-2), "pending");
+  assert.equal(rows[0].at(-4), "new");
+  assert.equal(rows[0].at(-3), "pending");
 });
 
 test("builds a plain-text notification without exposing secrets", () => {
