@@ -169,8 +169,9 @@ export default function DeleteAccountForm() {
                   maxLength={254}
                   autoComplete="email"
                   aria-invalid={Boolean(errors.email)}
+                  aria-describedby={errors.email ? "delete-email-error" : undefined}
                 />
-                {errors.email && <b>{errors.email}</b>}
+                {errors.email && <b id="delete-email-error">{errors.email}</b>}
               </label>
 
               <label className="feedback-field">
@@ -191,15 +192,49 @@ export default function DeleteAccountForm() {
                 <textarea name="notes" maxLength={2000} />
               </label>
 
-              <label className="feedback-field">
-                <span>Deletion confirmation</span>
-                <span>
-                  <input name="confirmation" type="checkbox" required /> I am
-                  requesting permanent deletion of my Gubify account and eligible
-                  personal data.
-                </span>
-                {errors.confirmation && <b>{errors.confirmation}</b>}
-              </label>
+              <div
+                style={{
+                  display: "grid",
+                  gap: 8,
+                  margin: "18px 0",
+                  color: "#294363",
+                }}
+              >
+                <strong>Deletion confirmation</strong>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <input
+                    name="confirmation"
+                    type="checkbox"
+                    required
+                    aria-invalid={Boolean(errors.confirmation)}
+                    aria-describedby={
+                      errors.confirmation
+                        ? "delete-confirmation-error"
+                        : undefined
+                    }
+                    style={{ width: 18, height: 18, marginTop: 3, flex: "0 0 auto" }}
+                  />
+                  <span>
+                    I am requesting permanent deletion of my Gubify account and
+                    eligible personal data.
+                  </span>
+                </label>
+                {errors.confirmation && (
+                  <small
+                    id="delete-confirmation-error"
+                    className="feedback-error"
+                  >
+                    {errors.confirmation}
+                  </small>
+                )}
+              </div>
 
               <div className="feedback-honeypot" aria-hidden="true">
                 <label htmlFor="delete-account-website">Website</label>
