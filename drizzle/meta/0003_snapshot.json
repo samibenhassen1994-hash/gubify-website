@@ -1,0 +1,202 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "92dace8f-ff47-4f4a-ae86-cdae1f89501f",
+  "prevId": "61f88fec-4429-482c-b7f9-7d56284d3ffc",
+  "tables": {
+    "account_deletion_requests": {
+      "name": "account_deletion_requests",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "confirmation": {
+          "name": "confirmation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'new'"
+        },
+        "notification_status": {
+          "name": "notification_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'pending'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "account_deletion_requests_email_idx": {
+          "name": "account_deletion_requests_email_idx",
+          "columns": [
+            "email"
+          ],
+          "isUnique": false
+        },
+        "account_deletion_requests_status_idx": {
+          "name": "account_deletion_requests_status_idx",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        },
+        "account_deletion_requests_created_at_idx": {
+          "name": "account_deletion_requests_created_at_idx",
+          "columns": [
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "account_deletion_requests_status_check": {
+          "name": "account_deletion_requests_status_check",
+          "value": "\"account_deletion_requests\".\"status\" in ('new', 'verifying', 'approved', 'completed', 'rejected', 'closed')"
+        },
+        "account_deletion_requests_notification_status_check": {
+          "name": "account_deletion_requests_notification_status_check",
+          "value": "\"account_deletion_requests\".\"notification_status\" in ('pending', 'sent', 'failed', 'not_configured')"
+        }
+      }
+    },
+    "feedback_reports": {
+      "name": "feedback_reports",
+      "columns": {
+        "id": { "name": "id", "type": "text", "primaryKey": true, "notNull": true, "autoincrement": false },
+        "type": { "name": "type", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "title": { "name": "title", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "description": { "name": "description", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "usefulness": { "name": "usefulness", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "steps_to_reproduce": { "name": "steps_to_reproduce", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "expected_behavior": { "name": "expected_behavior", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "beneficiary": { "name": "beneficiary", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "contact_email": { "name": "contact_email", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "app_version": { "name": "app_version", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "app_platform": { "name": "app_platform", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "operating_system": { "name": "operating_system", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "device_model": { "name": "device_model", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "browser": { "name": "browser", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "browser_version": { "name": "browser_version", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "language": { "name": "language", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "timezone": { "name": "timezone", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "viewport_width": { "name": "viewport_width", "type": "integer", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "viewport_height": { "name": "viewport_height", "type": "integer", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "page_url": { "name": "page_url", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "source_page": { "name": "source_page", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "origin": { "name": "origin", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false, "default": "'web'" },
+        "site_build_identifier": { "name": "site_build_identifier", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "status": { "name": "status", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false, "default": "'new'" },
+        "created_at": { "name": "created_at", "type": "integer", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "updated_at": { "name": "updated_at", "type": "integer", "primaryKey": false, "notNull": true, "autoincrement": false }
+      },
+      "indexes": {
+        "feedback_reports_type_idx": { "name": "feedback_reports_type_idx", "columns": ["type"], "isUnique": false },
+        "feedback_reports_status_idx": { "name": "feedback_reports_status_idx", "columns": ["status"], "isUnique": false },
+        "feedback_reports_created_at_idx": { "name": "feedback_reports_created_at_idx", "columns": ["created_at"], "isUnique": false }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "feedback_reports_type_check": { "name": "feedback_reports_type_check", "value": "\"feedback_reports\".\"type\" in ('bug', 'feature')" },
+        "feedback_reports_origin_check": { "name": "feedback_reports_origin_check", "value": "\"feedback_reports\".\"origin\" in ('web', 'app')" },
+        "feedback_reports_status_check": { "name": "feedback_reports_status_check", "value": "\"feedback_reports\".\"status\" in ('new', 'reviewing', 'planned', 'resolved', 'closed')" }
+      }
+    },
+    "pre_registrations": {
+      "name": "pre_registrations",
+      "columns": {
+        "id": { "name": "id", "type": "text", "primaryKey": true, "notNull": true, "autoincrement": false },
+        "email": { "name": "email", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "first_name": { "name": "first_name", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "device_interest": { "name": "device_interest", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "consent_version": { "name": "consent_version", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "consent_given": { "name": "consent_given", "type": "integer", "primaryKey": false, "notNull": true, "autoincrement": false, "default": false },
+        "consent_at": { "name": "consent_at", "type": "integer", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "privacy_policy_version": { "name": "privacy_policy_version", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "created_at": { "name": "created_at", "type": "integer", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "utm_source": { "name": "utm_source", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "utm_medium": { "name": "utm_medium", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "utm_campaign": { "name": "utm_campaign", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "utm_content": { "name": "utm_content", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "utm_term": { "name": "utm_term", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "landing_path": { "name": "landing_path", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "status": { "name": "status", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false, "default": "'active'" }
+      },
+      "indexes": {
+        "pre_registrations_email_unique": { "name": "pre_registrations_email_unique", "columns": ["email"], "isUnique": true },
+        "pre_registrations_status_idx": { "name": "pre_registrations_status_idx", "columns": ["status"], "isUnique": false },
+        "pre_registrations_utm_source_idx": { "name": "pre_registrations_utm_source_idx", "columns": ["utm_source"], "isUnique": false },
+        "pre_registrations_utm_campaign_idx": { "name": "pre_registrations_utm_campaign_idx", "columns": ["utm_campaign"], "isUnique": false }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "pre_registrations_device_interest_check": { "name": "pre_registrations_device_interest_check", "value": "\"pre_registrations\".\"device_interest\" in ('android', 'ios', 'both', 'other')" },
+        "pre_registrations_status_check": { "name": "pre_registrations_status_check", "value": "\"pre_registrations\".\"status\" in ('active', 'inactive')" }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}
