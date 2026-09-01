@@ -4,19 +4,21 @@ The public `/delete-account` page lets users request account deletion when they 
 
 Requests are protected by Cloudflare Turnstile, stored in the existing `COUNT` D1 database, and optionally emailed to the Gubify privacy inbox through Resend.
 
-## 1. Apply the D1 migration
+## 1. Apply the D1 schema change
 
-Review `drizzle/0003_account_deletion_requests.sql`, then apply pending migrations to the production database:
+Review `drizzle/0003_account_deletion_requests.sql`, then apply that exact file to the production D1 database:
 
 ```bash
-npx wrangler d1 migrations apply gubify-pre-registrations --remote
+npx wrangler d1 execute gubify-pre-registrations --remote --file drizzle/0003_account_deletion_requests.sql
 ```
 
-Verify the table:
+Verify the table and indexes:
 
 ```bash
 npx wrangler d1 execute gubify-pre-registrations --remote --command "SELECT name, type, sql FROM sqlite_schema WHERE name = 'account_deletion_requests' OR name LIKE 'account_deletion_requests_%' ORDER BY type, name;"
 ```
+
+Do not apply the SQL file twice. Confirm the intended Cloudflare account/database before running the command.
 
 ## 2. Configure email notifications
 
@@ -66,11 +68,11 @@ npx wrangler d1 execute gubify-pre-registrations --remote --command "SELECT id, 
 
 A web submission is a request, not immediate deletion. Before deleting an account:
 
-1. verify that the requester controls the account/email;
+1. verify that the requester controls the relevant Gubify account or can otherwise establish ownership;
 2. identify the correct Gubify account;
 3. perform the account/data deletion using the approved Gubify deletion process;
 4. update the request status to `completed` only after deletion is complete;
-5. keep only records that are still necessary for legal, security, or dispute purposes.
+5. keep only records that are still necessary for legal, security, fraud-prevention or dispute purposes.
 
 Allowed statuses are `new`, `verifying`, `approved`, `completed`, `rejected`, and `closed`.
 
