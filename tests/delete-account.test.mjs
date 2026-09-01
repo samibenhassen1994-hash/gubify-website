@@ -75,15 +75,19 @@ test("rejects invalid email, missing confirmation and missing Turnstile token", 
   );
 });
 
-test("stores a deletion request with pending notification status", async () => {
-  const rows = [];
+test("stores a deletion request only when the email has no active request", async () => {
+  const calls = [];
   const database = {
     prepare(sql) {
       assert.match(sql, /INSERT INTO account_deletion_requests/);
+      assert.match(sql, /NOT EXISTS/);
+      assert.match(sql, /status IN \('new', 'verifying', 'approved'\)/);
       return {
         bind(...values) {
-          rows.push(values);
-          return { run: async () => ({ success: true }) };
+          calls.push(values);
+          return {
+            run: async () => ({ meta: { changes: 1 } }),
+          };
         },
       };
     },
@@ -99,12 +103,37 @@ test("stores a deletion request with pending notification status", async () => {
   assert.equal(result.ok, true);
   if (!result.ok) return;
 
-  await saveDeletionRequest(database, result.data, 1234, "request-id");
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0][0], "request-id");
-  assert.equal(rows[0][1], "user@example.com");
-  assert.equal(rows[0].at(-4), "new");
-  assert.equal(rows[0].at(-3), "pending");
+  const inserted = await saveDeletionRequest(database, result.data, 1234, "request-id");
+  assert.equal(inserted, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], "request-id");
+  assert.equal(calls[0][1], "user@example.com");
+  assert.equal(calls[0].at(-1), "user@example.com");
+});
+
+test("reports that an active duplicate was not inserted", async () => {
+  const database = {
+    prepare(sql) {
+      assert.match(sql, /NOT EXISTS/);
+      return {
+        bind() {
+          return { run: async () => ({ meta: { changes: 0 } }) };
+        },
+      };
+    },
+  };
+  const result = validateDeletionRequest({
+    email: "user@example.com",
+    confirmation: true,
+    turnstileToken: "token",
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+
+  assert.equal(
+    await saveDeletionRequest(database, result.data, 1234, "request-id"),
+    false,
+  );
 });
 
 test("builds a plain-text notification without exposing secrets", () => {
@@ -150,6 +179,24 @@ test("renders the public account deletion page", async () => {
   assert.match(html, /href=["']\/privacy["']/i);
 });
 
+test("support Contact Gubify section links to account deletion", async () => {
+  const worker = await loadWorker();
+  const response = await worker.fetch(
+    new Request("http://localhost/support", {
+      headers: { accept: "text/html" },
+    }),
+    baseEnv,
+    executionContext,
+  );
+  const html = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(
+    html,
+    /<section[^>]*aria-labelledby=["']contact-title["'][^>]*>[\s\S]*?href=["']\/delete-account["'][^>]*>[\s\S]*?Delete account[\s\S]*?<\/section>/i,
+  );
+});
+
 test("account deletion endpoint stores a verified request and sends notification", async () => {
   const worker = await loadWorker();
   const originalFetch = globalThis.fetch;
@@ -159,10 +206,11 @@ test("account deletion endpoint stores a verified request and sends notification
   const database = {
     prepare(sql) {
       if (/INSERT INTO account_deletion_requests/.test(sql)) {
+        assert.match(sql, /NOT EXISTS/);
         return {
           bind(...values) {
             inserts.push(values);
-            return { run: async () => ({ success: true }) };
+            return { run: async () => ({ meta: { changes: 1 } }) };
           },
         };
       }
@@ -240,6 +288,63 @@ test("account deletion endpoint stores a verified request and sends notification
     assert.deepEqual(resendBody.to, ["privacy@gubify.com"]);
     assert.equal(resendBody.reply_to, "user@example.com");
     assert.doesNotMatch(resendBody.text, /valid-token/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete globalThis.__cloudflareTestEnv;
+  }
+});
+
+test("account deletion endpoint rejects an active duplicate without emailing", async () => {
+  const worker = await loadWorker();
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  const database = {
+    prepare(sql) {
+      if (/INSERT INTO account_deletion_requests/.test(sql)) {
+        return {
+          bind() {
+            return { run: async () => ({ meta: { changes: 0 } }) };
+          },
+        };
+      }
+      throw new Error(`Unexpected SQL: ${sql}`);
+    },
+  };
+  globalThis.__cloudflareTestEnv = {
+    COUNT: database,
+    TURNSTILE_SECRET_KEY: "secret",
+  };
+
+  try {
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+      outbound.push(url);
+      if (url.includes("challenges.cloudflare.com/turnstile")) {
+        return Response.json({ success: true });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    };
+
+    const response = await worker.fetch(
+      new Request("http://localhost/api/delete-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "user@example.com",
+          confirmation: true,
+          turnstileToken: "valid-token",
+        }),
+      }),
+      { ...baseEnv, COUNT: database, TURNSTILE_SECRET_KEY: "secret" },
+      executionContext,
+    );
+    const result = await response.json();
+
+    assert.equal(response.status, 409);
+    assert.equal(result.ok, false);
+    assert.equal(result.field, "email");
+    assert.match(result.error, /already being processed/i);
+    assert.equal(outbound.length, 1);
   } finally {
     globalThis.fetch = originalFetch;
     delete globalThis.__cloudflareTestEnv;
