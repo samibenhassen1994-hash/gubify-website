@@ -67,11 +67,18 @@ export async function saveDeletionRequest(
   now: number,
   id: string,
 ) {
-  await database
+  const result = await database
     .prepare(`INSERT INTO account_deletion_requests (
       id, email, display_name, notes, confirmation, status,
       notification_status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)`)
+    )
+    SELECT ?, ?, ?, ?, 1, ?, ?, ?, ?
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM account_deletion_requests
+      WHERE email = ?
+        AND status IN ('new', 'verifying', 'approved')
+    )`)
     .bind(
       id,
       data.email,
@@ -81,8 +88,11 @@ export async function saveDeletionRequest(
       "pending",
       now,
       now,
+      data.email,
     )
     .run();
+
+  return Number(result.meta?.changes ?? 0) > 0;
 }
 
 export async function updateDeletionNotificationStatus(
