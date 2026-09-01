@@ -75,7 +75,7 @@ export default function DeleteAccountForm() {
     const nextErrors: Record<string, string> = {};
 
     if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email)) {
-      nextErrors.email = "Enter the email associated with your Gubify account.";
+      nextErrors.email = "Enter a valid email address where we can contact you.";
     }
     if (!confirmation) {
       nextErrors.confirmation =
@@ -160,8 +160,12 @@ export default function DeleteAccountForm() {
 
             <form onSubmit={submit} noValidate>
               <label className="feedback-field">
-                <span>Account email</span>
-                <em>Use the email associated with your Gubify sign-in method.</em>
+                <span>Contact email</span>
+                <em>
+                  If your Gubify account has a linked email, use that address. If
+                  the account is anonymous, enter an email where we can contact you
+                  and describe the account in the optional fields below.
+                </em>
                 <input
                   name="email"
                   type="email"
@@ -176,7 +180,7 @@ export default function DeleteAccountForm() {
 
               <label className="feedback-field">
                 <span>
-                  Display name <small>Optional</small>
+                  Gubify display name <small>Optional</small>
                 </span>
                 <input name="displayName" type="text" maxLength={80} />
               </label>
@@ -186,7 +190,8 @@ export default function DeleteAccountForm() {
                   Notes <small>Optional</small>
                 </span>
                 <em>
-                  For example, tell us if you lost access to the app. Do not send
+                  For example, tell us if you lost access to the app or identify a
+                  Gub/Community connected to an anonymous account. Do not send
                   passwords or authentication codes.
                 </em>
                 <textarea name="notes" maxLength={2000} />
