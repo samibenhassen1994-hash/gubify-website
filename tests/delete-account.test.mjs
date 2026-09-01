@@ -7,6 +7,32 @@ import {
   validateDeletionRequest,
 } from "../lib/delete-account.ts";
 
+const baseEnv = {
+  ASSETS: {
+    fetch: async () => new Response("Not found", { status: 404 }),
+  },
+  IMAGES: {
+    input() {
+      throw new Error("Image processing is not expected in this test");
+    },
+  },
+};
+
+const executionContext = {
+  waitUntil() {},
+  passThroughOnException() {},
+};
+
+async function loadWorker() {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set(
+    "delete-account-test",
+    `${process.pid}-${Date.now()}-${Math.random()}`,
+  );
+  const { default: worker } = await import(workerUrl.href);
+  return worker;
+}
+
 test("validates a complete account deletion request", () => {
   const result = validateDeletionRequest({
     email: " User@Example.com ",
@@ -97,4 +123,125 @@ test("builds a plain-text notification without exposing secrets", () => {
   assert.match(email.text, /request-id/);
   assert.match(email.text, /user@example\.com/);
   assert.doesNotMatch(email.text, /turnstile-secret-token/);
+});
+
+test("renders the public account deletion page", async () => {
+  const worker = await loadWorker();
+  const response = await worker.fetch(
+    new Request("http://localhost/delete-account", {
+      headers: { accept: "text/html" },
+    }),
+    baseEnv,
+    executionContext,
+  );
+  const html = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(html, /Delete your Gubify account/i);
+  assert.match(html, /Request account deletion/i);
+  assert.match(
+    html,
+    /<input(?=[^>]*name=["']email["'])(?=[^>]*type=["']email["'])(?=[^>]*required)[^>]*>/i,
+  );
+  assert.match(
+    html,
+    /<input(?=[^>]*name=["']confirmation["'])(?=[^>]*type=["']checkbox["'])(?=[^>]*required)[^>]*>/i,
+  );
+  assert.match(html, /href=["']\/privacy["']/i);
+});
+
+test("account deletion endpoint stores a verified request and sends notification", async () => {
+  const worker = await loadWorker();
+  const originalFetch = globalThis.fetch;
+  const inserts = [];
+  const updates = [];
+  const outbound = [];
+  const database = {
+    prepare(sql) {
+      if (/INSERT INTO account_deletion_requests/.test(sql)) {
+        return {
+          bind(...values) {
+            inserts.push(values);
+            return { run: async () => ({ success: true }) };
+          },
+        };
+      }
+      if (/UPDATE account_deletion_requests SET notification_status/.test(sql)) {
+        return {
+          bind(...values) {
+            updates.push(values);
+            return { run: async () => ({ success: true }) };
+          },
+        };
+      }
+      throw new Error(`Unexpected SQL: ${sql}`);
+    },
+  };
+
+  globalThis.__cloudflareTestEnv = {
+    COUNT: database,
+    TURNSTILE_SECRET_KEY: "secret",
+    RESEND_API_KEY: "resend-secret",
+    DELETE_REQUEST_FROM_EMAIL: "Gubify <no-reply@gubify.com>",
+    DELETE_REQUEST_TO_EMAIL: "privacy@gubify.com",
+  };
+
+  try {
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      outbound.push({ url, init });
+      if (url.includes("challenges.cloudflare.com/turnstile")) {
+        return Response.json({ success: true });
+      }
+      if (url === "https://api.resend.com/emails") {
+        return Response.json({ id: "email-id" }, { status: 200 });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    };
+
+    const response = await worker.fetch(
+      new Request("http://localhost/api/delete-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "User@Example.com",
+          displayName: "User",
+          notes: "Lost access to the app",
+          confirmation: true,
+          turnstileToken: "valid-token",
+        }),
+      }),
+      {
+        ...baseEnv,
+        COUNT: database,
+        TURNSTILE_SECRET_KEY: "secret",
+        RESEND_API_KEY: "resend-secret",
+        DELETE_REQUEST_FROM_EMAIL: "Gubify <no-reply@gubify.com>",
+        DELETE_REQUEST_TO_EMAIL: "privacy@gubify.com",
+      },
+      executionContext,
+    );
+
+    const result = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(result.ok, true);
+    assert.equal(typeof result.requestId, "string");
+    assert.equal(inserts.length, 1);
+    assert.equal(inserts[0][1], "user@example.com");
+    assert.equal(updates.length, 1);
+    assert.equal(updates[0][0], "sent");
+    assert.equal(outbound.length, 2);
+
+    const resendRequest = outbound.find(
+      (entry) => entry.url === "https://api.resend.com/emails",
+    );
+    assert.ok(resendRequest);
+    const resendBody = JSON.parse(String(resendRequest.init?.body ?? "{}"));
+    assert.deepEqual(resendBody.to, ["privacy@gubify.com"]);
+    assert.equal(resendBody.reply_to, "user@example.com");
+    assert.doesNotMatch(resendBody.text, /valid-token/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete globalThis.__cloudflareTestEnv;
+  }
 });
