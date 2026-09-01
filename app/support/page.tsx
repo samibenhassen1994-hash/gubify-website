@@ -67,7 +67,7 @@ export default function SupportPage() {
             <span>02</span>
             <div>
               <h2 id="contact-title">Contact Gubify</h2>
-              <p>Choose the address that best matches your request.</p>
+              <p>Choose the address or action that best matches your request.</p>
             </div>
           </div>
           <div className="support-contact-grid">
@@ -77,6 +77,10 @@ export default function SupportPage() {
                 <strong>{address}</strong>
               </a>
             ))}
+            <Link href="/delete-account">
+              <span>Account deletion</span>
+              <strong>Delete account</strong>
+            </Link>
           </div>
         </section>
 
