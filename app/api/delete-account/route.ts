@@ -98,7 +98,24 @@ export async function POST(request: Request) {
 
     const requestId = crypto.randomUUID();
     const now = Date.now();
-    await saveDeletionRequest(runtime.COUNT, validation.data, now, requestId);
+    const inserted = await saveDeletionRequest(
+      runtime.COUNT,
+      validation.data,
+      now,
+      requestId,
+    );
+
+    if (!inserted) {
+      return Response.json(
+        {
+          ok: false,
+          field: "email",
+          error:
+            "A deletion request for this email is already being processed.",
+        },
+        { status: 409 },
+      );
+    }
 
     let notificationStatus: "sent" | "failed" | "not_configured" =
       "not_configured";
