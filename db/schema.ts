@@ -75,3 +75,31 @@ export const feedbackReports = sqliteTable(
     index("feedback_reports_created_at_idx").on(table.createdAt),
   ],
 );
+
+export const accountDeletionRequests = sqliteTable(
+  "account_deletion_requests",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+    displayName: text("display_name"),
+    notes: text("notes"),
+    confirmation: integer("confirmation", { mode: "boolean" }).notNull(),
+    status: text("status").notNull().default("new"),
+    notificationStatus: text("notification_status").notNull().default("pending"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    check(
+      "account_deletion_requests_status_check",
+      sql`${table.status} in ('new', 'verifying', 'approved', 'completed', 'rejected', 'closed')`,
+    ),
+    check(
+      "account_deletion_requests_notification_status_check",
+      sql`${table.notificationStatus} in ('pending', 'sent', 'failed', 'not_configured')`,
+    ),
+    index("account_deletion_requests_email_idx").on(table.email),
+    index("account_deletion_requests_status_idx").on(table.status),
+    index("account_deletion_requests_created_at_idx").on(table.createdAt),
+  ],
+);

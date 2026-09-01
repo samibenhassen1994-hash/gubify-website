@@ -5,12 +5,12 @@ import LegalFooter from "../legal-footer";
 export const metadata: Metadata = {
   title: "Privacy Policy | Gubify",
   description:
-    "Learn how Gubify processes personal data when you use the Gubify app, website, pre-registration and feedback services.",
+    "Learn how Gubify processes personal data when you use the Gubify app, website, pre-registration, feedback and account deletion services.",
   alternates: { canonical: "/privacy" },
   openGraph: {
     title: "Privacy Policy | Gubify",
     description:
-      "Learn how Gubify processes personal data when you use the Gubify app, website, pre-registration and feedback services.",
+      "Learn how Gubify processes personal data when you use the Gubify app, website, pre-registration, feedback and account deletion services.",
     url: "https://gubify.com/privacy",
     siteName: "Gubify",
     type: "website",
@@ -56,6 +56,7 @@ export default function PrivacyPage() {
         </Link>
         <nav aria-label="Privacy page links">
           <Link href="/support">Support</Link>
+          <Link href="/delete-account">Delete Account</Link>
           <Link href="/terms">Terms of Service</Link>
         </nav>
       </header>
@@ -65,12 +66,13 @@ export default function PrivacyPage() {
         <h1>Privacy Policy</h1>
         <p>
           This policy explains what personal data Gubify processes when you use
-          the Gubify app, website, pre-registration and feedback services, why
-          those data are used, who may receive them and what choices you have.
+          the Gubify app, website, pre-registration, feedback and account deletion
+          services, why those data are used, who may receive them and what choices
+          you have.
         </p>
         <div className="legal-meta">
-          <span><strong>Last updated</strong> August 7, 2026</span>
-          <span><strong>Policy version</strong> 2026-08-07.2</span>
+          <span><strong>Last updated</strong> September 1, 2026</span>
+          <span><strong>Policy version</strong> 2026-09-01.1</span>
         </div>
       </section>
 
@@ -90,7 +92,8 @@ export default function PrivacyPage() {
               communicate, organise activities and coordinate shared information
               inside private Gubs and Communities. This Privacy Policy applies to
               the Gubify mobile application, gubify.com and the related
-              pre-registration, support and feedback services operated by Gubify.
+              pre-registration, support, feedback and account deletion services
+              operated by Gubify.
             </p>
             <p>
               Gubify is operated from Italy. The EU General Data Protection
@@ -135,13 +138,17 @@ export default function PrivacyPage() {
             <ul>
               <li>a Firebase Authentication user identifier;</li>
               <li>your chosen display name;</li>
+              <li>an email address when you link or create an email-based sign-in;</li>
+              <li>Google account identity information made available through Google Sign-In when you choose that sign-in method;</li>
               <li>account creation and update timestamps;</li>
               <li>profile information you choose to provide when a related feature is available.</li>
             </ul>
             <p>
-              At the date of this policy, the app initially authenticates users
-              through Firebase anonymous authentication. Gubify does not currently
-              require a phone number or password to create this initial app identity.
+              Gubify may initially create a technical identity through Firebase
+              anonymous authentication. You can secure or access an account through
+              supported sign-in methods such as Google Sign-In or email and password.
+              The exact account information processed therefore depends on the
+              authentication method you choose.
             </p>
 
             <h3>3.2 Gub and Community information</h3>
@@ -223,6 +230,14 @@ export default function PrivacyPage() {
               required by the pre-registration form is necessary to complete that
               pre-registration.
             </p>
+            <p>
+              If you use the public account deletion request form, Gubify processes
+              the contact email you provide, an optional display name, optional notes,
+              confirmation of the deletion request, request status and timestamps.
+              These data are used to receive, verify, manage and document the request.
+              Do not include passwords, authentication codes or unrelated sensitive
+              information in the notes field.
+            </p>
           </section>
 
           <section id="feedback">
@@ -277,6 +292,7 @@ export default function PrivacyPage() {
               <li>maintain read state and other feature state necessary for the app to work;</li>
               <li>record pre-registration and send communications directly connected to beta access or launch;</li>
               <li>receive, investigate and respond to feedback, support and bug reports;</li>
+              <li>receive, verify and complete account or personal-data deletion requests;</li>
               <li>protect users and the service from spam, fraud, misuse, unauthorised access and other abuse;</li>
               <li>maintain, debug and improve reliability and security;</li>
               <li>respond to privacy requests and comply with applicable legal obligations.</li>
@@ -340,6 +356,12 @@ export default function PrivacyPage() {
                 Cloudflare Workers, Cloudflare D1, Cloudflare Turnstile, security
                 and abuse prevention.
               </li>
+              <li>
+                <strong>Resend</strong> — when configured, used to deliver an internal
+                notification to Gubify when a user submits an account deletion request.
+                The notification may contain the contact details and request information
+                the user submitted so that Gubify can review and verify the request.
+              </li>
             </ul>
             <p>
               Personal data may also be disclosed where reasonably necessary to
@@ -354,9 +376,9 @@ export default function PrivacyPage() {
               Gubify is available internationally and some service providers operate
               distributed infrastructure outside the European Economic Area (EEA).
               In particular, Firebase Authentication may process data in the United
-              States, while other Firebase and Cloudflare services may use global
-              infrastructure. As a result, personal data may be processed in
-              countries other than the country where you live.
+              States, while other Firebase, Cloudflare and email-delivery services
+              may use global infrastructure. As a result, personal data may be
+              processed in countries other than the country where you live.
             </p>
             <p>
               Where personal data are transferred from the EEA or from another
@@ -405,7 +427,9 @@ export default function PrivacyPage() {
                 <strong>Content shared with other users</strong> may remain available
                 to the relevant Gub or Community until it, the relevant container or
                 the associated account is deleted in accordance with the available
-                product controls and applicable law.
+                product controls and applicable law. Where appropriate, shared
+                history may be anonymised rather than removed when needed to preserve
+                other users&apos; legitimate records or the integrity of group activity.
               </li>
               <li>
                 <strong>Pre-registration data</strong> are retained until launch and,
@@ -418,6 +442,13 @@ export default function PrivacyPage() {
                 ordinarily retained for no longer than 24 months, unless longer
                 retention is reasonably necessary for security, legal or dispute-related reasons.
               </li>
+              <li>
+                <strong>Account deletion request records</strong> are retained only
+                for as long as reasonably necessary to verify, process, document and
+                complete the request, and for any additional period required for
+                legal, security, fraud-prevention or dispute-related reasons. They are
+                then deleted or anonymised where reasonably possible and appropriate.
+              </li>
             </ul>
             <p>
               When data are no longer needed for a legitimate purpose, Gubify will
@@ -428,16 +459,27 @@ export default function PrivacyPage() {
           <section className="legal-callout" id="deletion">
             <h2>14. Deletion and account requests</h2>
             <p>
-              You may request deletion of personal data associated with you by
-              contacting <MailLink address="privacy@gubify.com" />. Gubify may need
-              to verify that the request relates to you before acting on it.
+              If you can access your Gubify account, you can use the in-app
+              <strong> Account → Delete account</strong> control to request permanent
+              deletion of the account and eligible personal data. The deletion flow
+              may require reauthentication and may prevent deletion while an account
+              still owns a Gub or Community that must first be transferred or removed.
             </p>
             <p>
-              Pre-registration deletion is also available through the Gubify Support
-              Center. Account-deletion controls will be made available for app
-              accounts when account-based beta access is enabled.
+              If you cannot access the app, you can submit a deletion request through
+              the public <Link href="/delete-account">account deletion page</Link>.
+              Gubify may need to verify that the request relates to you before acting
+              on it. You can also contact <MailLink address="privacy@gubify.com" />
+              for privacy-related assistance.
             </p>
-            <Link href="/support">Open the Gubify Support Center</Link>
+            <p>
+              Deletion does not require removal of information that Gubify must retain
+              for a legal obligation, security, fraud-prevention or dispute purpose.
+              Content that forms part of shared group history may be anonymised where
+              appropriate instead of being removed when this is necessary to preserve
+              other users&apos; legitimate records or service integrity.
+            </p>
+            <Link href="/delete-account">Open the account deletion request page</Link>
           </section>
 
           <section id="rights">
@@ -546,8 +588,8 @@ export default function PrivacyPage() {
           </section>
 
           <div className="legal-version">
-            <p><strong>Last updated:</strong> August 7, 2026</p>
-            <p><strong>Privacy policy version:</strong> 2026-08-07.2</p>
+            <p><strong>Last updated:</strong> September 1, 2026</p>
+            <p><strong>Privacy policy version:</strong> 2026-09-01.1</p>
           </div>
         </article>
       </div>
