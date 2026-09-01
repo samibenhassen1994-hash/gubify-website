@@ -59,7 +59,7 @@ export default function SupportPage() {
             <a href="#contact-title"><strong>Contact Us</strong><span>Find the right email address</span></a>
             <Link href="/privacy"><strong>Privacy Policy</strong><span>How Gubify handles information</span></Link>
             <Link href="/terms"><strong>Terms of Service</strong><span>Rules for using this website</span></Link>
-            <a href="#delete-pre-registration"><strong>Delete your pre-registration</strong><span>Request removal of your record</span></a>
+            <a href="#delete-pre-registration"><strong>Delete data or account</strong><span>Delete a pre-registration or request account deletion</span></a>
           </div>
         </section>
         <section aria-labelledby="contact-title">
@@ -67,7 +67,7 @@ export default function SupportPage() {
             <span>02</span>
             <div>
               <h2 id="contact-title">Contact Gubify</h2>
-              <p>Choose the address or action that best matches your request.</p>
+              <p>Choose the address that best matches your request.</p>
             </div>
           </div>
           <div className="support-contact-grid">
@@ -77,10 +77,6 @@ export default function SupportPage() {
                 <strong>{address}</strong>
               </a>
             ))}
-            <Link href="/delete-account">
-              <span>Account deletion</span>
-              <strong>Delete account</strong>
-            </Link>
           </div>
         </section>
 
@@ -88,47 +84,65 @@ export default function SupportPage() {
           <div className="support-center-heading">
             <span>03</span>
             <div>
-              <h2 id="deletion-title">Delete your pre-registration</h2>
+              <h2 id="deletion-title">Delete your pre-registration or request account deletion</h2>
               <p>
-                To request the deletion of your Gubify pre-registration, send an
-                email to <a href="mailto:privacy@gubify.com">privacy@gubify.com</a> from
-                the same email address used for the pre-registration.
+                Choose the option that matches what you want to remove from Gubify.
               </p>
             </div>
           </div>
           <div className="deletion-grid">
             <div>
-              <h3>Include in your email</h3>
+              <h3>Delete your pre-registration</h3>
+              <p>
+                If you only joined the Gubify pre-registration list, you can ask us
+                to remove that record without affecting any separate app account.
+              </p>
               <ul>
-                <li>Subject: “Pre-registration deletion request”</li>
-                <li>The email address used for registration</li>
-                <li>First name, if provided</li>
-                <li>A clear request to delete the pre-registration</li>
+                <li>Use the same email address used for pre-registration</li>
+                <li>Include your first name if you provided one</li>
+                <li>Clearly ask us to delete your pre-registration</li>
               </ul>
               <a
                 className="legal-primary-link"
                 href="mailto:privacy@gubify.com?subject=Pre-registration%20deletion%20request"
               >
-                Start deletion request
+                Delete pre-registration
               </a>
             </div>
-            <div className="deletion-note">
-              <h3>Verification and timing</h3>
+            <div>
+              <h3>Delete your Gubify account</h3>
               <p>
-                To protect users, it may be necessary to verify that the request
-                comes from the owner of the email address.
+                If you have a Gubify app account, use the account-deletion request
+                page when you cannot complete deletion directly from the app or need
+                help with the process.
               </p>
-              <p>
-                Requests will be handled without undue delay and, where the GDPR
-                applies, a response will normally be provided within one month.
-                This period may be extended where permitted by law, for example
-                in particularly complex cases.
-              </p>
-              <p>
-                Once the request has been verified, the pre-registration data
-                will be deleted unless retention is required by applicable law.
-              </p>
+              <ul>
+                <li>Submit the email we can use to contact you</li>
+                <li>Provide your Gubify display name if available</li>
+                <li>We verify ownership before deleting account data</li>
+              </ul>
+              <Link className="legal-primary-link" href="/delete-account">
+                Request account deletion
+              </Link>
             </div>
+          </div>
+          <div className="deletion-note">
+            <h3>Verification and timing</h3>
+            <p>
+              To protect users, Gubify may need to verify that a deletion request
+              comes from the person connected to the relevant account or email.
+            </p>
+            <p>
+              Requests will be handled without undue delay and, where the GDPR
+              applies, a response will normally be provided within one month. This
+              period may be extended where permitted by law, for example in
+              particularly complex cases.
+            </p>
+            <p>
+              Once a request has been verified, the relevant data will be deleted
+              unless limited retention is required by applicable law, security,
+              fraud-prevention or dispute-related needs.
+            </p>
           </div>
         </section>
 
@@ -184,7 +198,8 @@ export default function SupportPage() {
             <details><summary>How does pre-registration work?</summary><p>You provide an email, device preference and consent. Gubify uses them to manage pre-registration and send the launch notification.</p></details>
             <details><summary>How can I report a bug?</summary><p>Use the <Link href="/feedback?type=bug">bug report form</Link> and include clear steps when possible.</p></details>
             <details><summary>How can I suggest a feature?</summary><p>Use the <Link href="/feedback?type=feature">feature suggestion form</Link> and explain the problem your idea would solve.</p></details>
-            <details><summary>How do I delete my pre-registration?</summary><p>Follow the <a href="#delete-pre-registration">deletion instructions</a> on this page.</p></details>
+            <details><summary>How do I delete my pre-registration?</summary><p>Follow the <a href="#delete-pre-registration">deletion options</a> on this page.</p></details>
+            <details><summary>How do I request deletion of my Gubify account?</summary><p>Use the <Link href="/delete-account">account deletion request page</Link> or delete the account directly from the app when you still have access.</p></details>
             <details><summary>Which devices will support Gubify?</summary><p>Platform availability will be confirmed as development and beta testing progress. The pre-registration survey helps prioritise platforms.</p></details>
             <details><summary>Will my feedback be public?</summary><p>No public feedback directory is provided. Reports are used internally to review issues and product ideas.</p></details>
             <details><summary>How can I contact Gubify?</summary><p>Use the contact addresses above, choosing the one that best matches your request.</p></details>
