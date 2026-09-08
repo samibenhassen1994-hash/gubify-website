@@ -81,6 +81,8 @@ function assertBoundedStructuredQueries(requests) {
       `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`,
     );
     assert.equal(request.init?.method, "POST");
+    assert.equal(request.init?.redirect, "manual");
+    assert.notEqual(request.init?.redirect, "error");
     assert.equal(request.body.structuredQuery.limit, pageSize);
     assert.ok(request.body.structuredQuery.limit <= 100);
     assert.equal(Object.hasOwn(request.body.structuredQuery, "offset"), false);

@@ -84,6 +84,8 @@ test("reads one masked public Community document and maps only public fields", a
     "updatedAt",
   ]);
   assert.equal(requests[0].init?.method, "GET");
+  assert.equal(requests[0].init?.redirect, "manual");
+  assert.notEqual(requests[0].init?.redirect, "error");
   assert.deepEqual(result, {
     status: "found",
     community: {

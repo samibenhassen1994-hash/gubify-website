@@ -159,7 +159,7 @@ export async function fetchPublicCommunityBySlug(
     const response = await (options.fetcher ?? fetch)(url, {
       method: "GET",
       headers: { Accept: "application/json" },
-      redirect: "error",
+      redirect: "manual",
     });
     if (response.status === 404) return { status: "not-found" };
     if (!response.ok) return { status: "upstream-failure" };

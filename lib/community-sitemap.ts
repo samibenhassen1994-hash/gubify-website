@@ -47,40 +47,6 @@ function malformedResponse(): never {
   throw new Error("Firestore returned a malformed Community sitemap response.");
 }
 
-function serializeCaughtError(error: unknown): {
-  name: string;
-  message: string;
-  stack: string | null;
-} {
-  const fallbackMessage = (() => {
-    try {
-      return String(error);
-    } catch {
-      return "[unserializable thrown value]";
-    }
-  })();
-
-  try {
-    if (error && (typeof error === "object" || typeof error === "function")) {
-      const candidate = error as { name?: unknown; message?: unknown; stack?: unknown };
-      return {
-        name: typeof candidate.name === "string" ? candidate.name : "NonErrorThrown",
-        message:
-          typeof candidate.message === "string" ? candidate.message : fallbackMessage,
-        stack: typeof candidate.stack === "string" ? candidate.stack : null,
-      };
-    }
-  } catch {
-    // Fall through to the safe scalar representation below.
-  }
-
-  return {
-    name: "NonErrorThrown",
-    message: fallbackMessage,
-    stack: null,
-  };
-}
-
 function parseFirestoreTimestamp(value: unknown): Date | null {
   if (typeof value !== "string") return null;
   const match = value.match(
@@ -239,14 +205,9 @@ export async function fetchCommunitySitemapEntries(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ structuredQuery }),
-        redirect: "error",
+        redirect: "manual",
       });
     } catch (error) {
-      console.error({
-        diagnosticTag: "community-sitemap-firestore-fetch",
-        target: "firestore.googleapis.com",
-        error: serializeCaughtError(error),
-      });
       throw new Error("Firestore Community sitemap query failed.", {
         cause: error,
       });
