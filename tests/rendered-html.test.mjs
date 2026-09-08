@@ -29,6 +29,9 @@ test("generated deploy config preserves the COUNT D1 binding", async () => {
   };
 
   assert.deepEqual(config.d1_databases, [expected]);
+  assert.deepEqual(config.vars, {
+    FIREBASE_PROJECT_ID: "gubify-a3e2c",
+  });
   assert.equal(
     Object.hasOwn(config, "env"),
     false,

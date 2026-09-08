@@ -11,6 +11,7 @@ declare module "cloudflare:workers" {
     RESEND_API_KEY?: string;
     DELETE_REQUEST_FROM_EMAIL?: string;
     DELETE_REQUEST_TO_EMAIL?: string;
+    FIREBASE_PROJECT_ID?: string;
     [key: string]: unknown;
   };
 }

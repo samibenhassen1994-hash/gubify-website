@@ -17,6 +17,9 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const workerConfig = {
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
+  vars: {
+    FIREBASE_PROJECT_ID: "gubify-a3e2c",
+  },
   d1_databases: [countDatabase],
   r2_buckets: r2
     ? [
