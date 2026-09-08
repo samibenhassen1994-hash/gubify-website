@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const imageUrl =
@@ -64,6 +65,10 @@ function requestsFor(slug) {
 }
 
 const worker = (await import(new URL("../dist/server/index.js", import.meta.url))).default;
+const communityCss = await readFile(
+  new URL("../app/community/[slug]/community.module.css", import.meta.url),
+  "utf8",
+);
 
 test("renders one public Community request with image and complete metadata", async () => {
   const slug = "football-italia-image";
@@ -90,6 +95,12 @@ test("renders one public Community request with image and complete metadata", as
         html,
         new RegExp(`<img(?=[^>]*src=["']${imageUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'])(?=[^>]*alt=["']Football Italia Community["'])[^>]*>`, "i"),
       );
+      assert.match(html, /<div[^>]*class=["'][^"']*imageFrame[^"']*["'][^>]*>[\s\S]*?<img/i);
+      assert.match(html, /<div[^>]*class=["'][^"']*content[^"']*["'][^>]*>[\s\S]*?Public Community[\s\S]*?<h1[^>]*>Football Italia<\/h1>[\s\S]*?Italian football fans\./i);
+      assert.match(html, /<button(?=[^>]*disabled)(?=[^>]*aria-disabled=["']true["'])[^>]*>Entra nella community<\/button>/i);
+      assert.doesNotMatch(html, /href=["'](?:gubify|https?:\/\/[^"']*(?:play\.google|apps\.apple))/i);
+      assert.match(communityCss, /\.imageFrame\s*\{[^}]*border-radius:\s*50%/s);
+      assert.match(communityCss, /\.content\s*\{[^}]*text-align:\s*center/s);
       assert.match(html, /<title>Football Italia \| Gubify<\/title>/i);
       assert.match(
         html,
@@ -124,6 +135,7 @@ test("renders a Community without an image or Open Graph image metadata", async 
       assert.match(html, /<h1[^>]*>Football Italia<\/h1>/i);
       assert.doesNotMatch(html, /<img\b/i);
       assert.doesNotMatch(html, /property=["']og:image["']/i);
+      assert.match(html, /<button(?=[^>]*disabled)[^>]*>Entra nella community<\/button>/i);
 });
 
 test("returns 404 for invalid and nonexistent Community slugs", async () => {

@@ -6,6 +6,7 @@ import SiteHeader from "../../site-header";
 import { fetchPublicCommunityBySlug } from "../../../lib/community-public";
 
 import styles from "./community.module.css";
+import CommunityCta from "./community-cta";
 
 type CommunityPageProps = {
   params: Promise<{ slug: string }>;
@@ -64,8 +65,8 @@ export default async function CommunityPage({ params }: CommunityPageProps) {
               <img
                 src={community.imageUrl}
                 alt={`${community.name} Community`}
-                width={1200}
-                height={675}
+                width={176}
+                height={176}
               />
             </div>
           ) : null}
@@ -85,6 +86,7 @@ export default async function CommunityPage({ params }: CommunityPageProps) {
                 <dd>{accessModeLabel(community.accessMode)}</dd>
               </div>
             </dl>
+            <CommunityCta slug={community.slug} />
           </div>
         </article>
       </main>
