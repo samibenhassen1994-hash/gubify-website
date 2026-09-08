@@ -19,6 +19,58 @@ interface ExecutionContext {
   passThroughOnException(): void;
 }
 
+type SitemapCache = Pick<Cache, "match" | "put">;
+type NextHandler = () => Promise<Response>;
+
+const SITEMAP_CACHE_CONTROL = "public, max-age=86400";
+const SITEMAP_CACHE_HEADER = "X-Gubify-Sitemap-Cache";
+
+function copyResponse(response: Response, headers: Headers): Response {
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+export async function handleRequestWithSitemapCache(
+  request: Request,
+  ctx: ExecutionContext,
+  next: NextHandler,
+  cache: SitemapCache,
+): Promise<Response> {
+  const url = new URL(request.url);
+  if (request.method !== "GET" || url.pathname !== "/sitemap.xml") {
+    return next();
+  }
+
+  const cacheKey = new Request(`${url.origin}/sitemap.xml`, { method: "GET" });
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    const headers = new Headers(cached.headers);
+    headers.set(SITEMAP_CACHE_HEADER, "HIT");
+    return copyResponse(cached, headers);
+  }
+
+  const response = await next();
+  if (response.status !== 200) {
+    const headers = new Headers(response.headers);
+    headers.set(SITEMAP_CACHE_HEADER, "MISS");
+    return copyResponse(response, headers);
+  }
+
+  const cacheHeaders = new Headers(response.headers);
+  cacheHeaders.set("Cache-Control", SITEMAP_CACHE_CONTROL);
+  cacheHeaders.delete(SITEMAP_CACHE_HEADER);
+  const cacheResponse = copyResponse(response.clone(), cacheHeaders);
+  ctx.waitUntil(cache.put(cacheKey, cacheResponse));
+
+  const clientHeaders = new Headers(response.headers);
+  clientHeaders.set("Cache-Control", SITEMAP_CACHE_CONTROL);
+  clientHeaders.set(SITEMAP_CACHE_HEADER, "MISS");
+  return copyResponse(response, clientHeaders);
+}
+
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
 // To route SVGs through the optimizer (with security headers), set
@@ -40,7 +92,16 @@ const worker = {
       }, allowedWidths);
     }
 
-    return handler.fetch(request, env, ctx);
+    if (request.method !== "GET" || url.pathname !== "/sitemap.xml") {
+      return handler.fetch(request, env, ctx);
+    }
+
+    return handleRequestWithSitemapCache(
+      request,
+      ctx,
+      () => handler.fetch(request, env, ctx),
+      (caches as CacheStorage & { default: Cache }).default,
+    );
   },
 };
 
