@@ -18,7 +18,7 @@ export default function AskBestAnswerSection() {
           <p className={styles.storyPath}>Great answers stand out. Your contribution matters.</p>
         </div>
         <div className={styles.reputationDemo}>
-          <img className={`${styles.sceneAvatar} ${styles.askAvatar}`} src="/home/avatars/avatar-bolla.png" alt="" />
+          <img className={styles.sceneAvatar} src="/home/avatars/avatar-bolla.png" alt="" />
           <AskDemo />
         </div>
       </div>
