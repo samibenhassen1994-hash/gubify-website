@@ -1,4 +1,3 @@
-import InteractivePhone from "./interactive-phone";
 import styles from "./home.module.css";
 
 const privateFeatures = ["Chat together", "Organize tasks", "Plan events", "Vote on proposals", "Manage a shared budget"];
@@ -15,6 +14,15 @@ export default function PrivateGubsSection() {
             Keep your closest people in one private Gub. Talk naturally, then turn the things you decide into Tasks,
             Events, Proposals and Shared Budgets without losing the conversation around them.
           </p>
+          <div className={styles.whiteInfoCard}>
+            <h3>Inside a Private Gub</h3>
+            <ul>
+              <li>Chat with the people closest to you.</li>
+              <li>Turn decisions into Tasks and Events.</li>
+              <li>Vote together with Proposals.</li>
+              <li>Keep a Shared Budget visible to the group.</li>
+            </ul>
+          </div>
           <div className={styles.featureLine}>
             {privateFeatures.map((feature) => <span key={feature}>{feature}</span>)}
           </div>
@@ -29,7 +37,6 @@ export default function PrivateGubsSection() {
           <div className={styles.sceneBubble}><b>◉</b>Voting</div>
           <div className={styles.sceneBubble}><b>€</b>Budget</div>
           <img className={styles.sceneAvatar} src="/home/avatars/avatar-nano.png" alt="" />
-          <InteractivePhone compact initialMode="private" ariaLabel="Interactive Private Gub demo" />
         </div>
       </div>
     </section>
