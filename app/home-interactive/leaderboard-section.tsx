@@ -25,7 +25,7 @@ export default function LeaderboardSection() {
               </div>
             ))}
           </div>
-          <span className={styles.demoBoardLabel}>Illustrative leaderboard</span>
+          <span className={styles.kicker}>Illustrative leaderboard</span>
         </div>
 
         <div className={styles.sectionCopy}>
