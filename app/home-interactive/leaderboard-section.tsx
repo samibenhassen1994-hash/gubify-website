@@ -1,4 +1,5 @@
 import styles from "./home.module.css";
+import refineStyles from "./refinement.module.css";
 
 const podium = [
   { place: 2, name: "Maya", level: 16, answers: 35, image: "/home/avatars/avatar-bolla.png" },
@@ -15,7 +16,7 @@ export default function LeaderboardSection() {
             {podium.map((member) => (
               <div className={styles.podiumPlace} key={member.place}>
                 {member.place === 1 && <span className={styles.crown} aria-hidden="true">♛</span>}
-                <img className={styles.podiumAvatar} src={member.image} alt="" />
+                <img className={`${styles.podiumAvatar} ${refineStyles.avatarClean}`} src={member.image} alt="" />
                 <b>{member.place}</b>
                 <div className={styles.podiumMeta}>
                   <strong>{member.name}</strong>
@@ -35,7 +36,7 @@ export default function LeaderboardSection() {
             Gubify makes helpful participation visible. Best Answers build XP, XP builds your level, and your level
             helps your contribution stand out inside the Community.
           </p>
-          <div className={styles.whiteInfoCard}>
+          <div className={refineStyles.whiteInfoCard}>
             <h3>How members stand out</h3>
             <ul>
               <li>Help other people with useful participation.</li>
