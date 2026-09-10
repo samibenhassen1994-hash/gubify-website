@@ -7,6 +7,7 @@ import { fetchPublicCommunityBySlug } from "../../../lib/community-public";
 
 import styles from "./community.module.css";
 import CommunityCta from "./community-cta";
+import CommunityShare from "./community-share";
 
 type CommunityPageProps = {
   params: Promise<{ slug: string }>;
@@ -87,6 +88,10 @@ export default async function CommunityPage({ params }: CommunityPageProps) {
               </div>
             </dl>
             <CommunityCta slug={community.slug} />
+            <CommunityShare
+              slug={community.slug}
+              communityName={community.name}
+            />
           </div>
         </article>
       </main>

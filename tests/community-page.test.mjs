@@ -98,6 +98,7 @@ test("renders one public Community request with image and complete metadata", as
       assert.match(html, /<div[^>]*class=["'][^"']*imageFrame[^"']*["'][^>]*>[\s\S]*?<img/i);
       assert.match(html, /<div[^>]*class=["'][^"']*content[^"']*["'][^>]*>[\s\S]*?Public Community[\s\S]*?<h1[^>]*>Football Italia<\/h1>[\s\S]*?Italian football fans\./i);
       assert.match(html, /<button(?=[^>]*disabled)(?=[^>]*aria-disabled=["']true["'])[^>]*>Entra nella community<\/button>/i);
+      assert.match(html, /<button[^>]*>Share Community<\/button>/i);
       assert.doesNotMatch(html, /href=["'](?:gubify|https?:\/\/[^"']*(?:play\.google|apps\.apple))/i);
       assert.match(communityCss, /\.imageFrame\s*\{[^}]*border-radius:\s*50%/s);
       assert.match(communityCss, /\.content\s*\{[^}]*text-align:\s*center/s);
