@@ -1,5 +1,6 @@
 import Link from "next/link";
 import styles from "./home.module.css";
+import refineStyles from "./refinement.module.css";
 
 export default function CommunitiesSection() {
   return (
@@ -8,8 +9,8 @@ export default function CommunitiesSection() {
       <div className={`${styles.sectionGrid} ${styles.sectionGridReverse}`}>
         <div className={`${styles.sectionVisual} ${styles.communityScene}`} aria-label="Community discovery world">
           <div className={styles.orbit} aria-hidden="true" />
-          <img className={styles.sceneAvatar} src="/home/avatars/avatar-fantasma.png" alt="" />
-          <img className={styles.sceneAvatar} src="/home/avatars/avatar-bolla.png" alt="" />
+          <img className={`${styles.sceneAvatar} ${refineStyles.avatarClean}`} src="/home/avatars/avatar-fantasma.png" alt="" />
+          <img className={`${styles.sceneAvatar} ${refineStyles.avatarClean}`} src="/home/avatars/avatar-bolla.png" alt="" />
           <div className={styles.sceneBubble}><b>🎮</b>Gaming</div>
           <div className={styles.sceneBubble}><b>💻</b>Tech</div>
           <div className={styles.sceneBubble}><b>♫</b>Music</div>
@@ -25,7 +26,7 @@ export default function CommunitiesSection() {
             Search by interest, open a Community, join the conversation and use Ask when you need a useful answer.
             Helpful members build XP, level up and become recognizable inside their Community.
           </p>
-          <div className={styles.whiteInfoCard}>
+          <div className={refineStyles.whiteInfoCard}>
             <h3>Inside a Community</h3>
             <ul>
               <li>Discover spaces built around your interests.</li>
