@@ -35,6 +35,15 @@ export default function LeaderboardSection() {
             Gubify makes helpful participation visible. Best Answers build XP, XP builds your level, and your level
             helps your contribution stand out inside the Community.
           </p>
+          <div className={styles.whiteInfoCard}>
+            <h3>How members stand out</h3>
+            <ul>
+              <li>Help other people with useful participation.</li>
+              <li>Best Answers reward quality contributions with XP.</li>
+              <li>XP raises your level inside that Community.</li>
+              <li>Levels and Best Answers make contribution visible in the leaderboard.</li>
+            </ul>
+          </div>
           <p className={styles.storyPath}>Helpful participation → Best Answers → XP → Level → Recognition</p>
           <div className={styles.featureLine}>
             <span>Help people</span><span>Earn XP</span><span>Build your level</span><span>Stand out</span>
