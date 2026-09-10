@@ -21,7 +21,7 @@ export default function LeaderboardSection() {
         </div>
       </div>
 
-      <div className={styles.leaderScene} aria-label="Community reputation preview">
+      <div className={styles.leaderScene} role="group" aria-label="Community reputation preview">
         <div className={styles.podium}>
           <div className={`${styles.podiumPlace} ${styles.placeTwo}`}><PurpleAvatar variant="round" expression="happy" /><b>2</b></div>
           <div className={`${styles.podiumPlace} ${styles.placeOne}`}><span className={styles.crown} aria-hidden="true">♛</span><PurpleAvatar variant="sprout" expression="proud" /><b>1</b></div>
