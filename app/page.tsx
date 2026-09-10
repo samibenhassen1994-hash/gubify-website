@@ -8,10 +8,11 @@ import LeaderboardSection from "./home/leaderboard-section";
 import PrivateGubsSection from "./home/private-gubs-section";
 import TwoWaysSection from "./home/two-ways-section";
 import styles from "./home/home.module.css";
+import shellStyles from "./home/home-shell.module.css";
 
 export default function Home() {
   return (
-    <div className={styles.site} id="top">
+    <div className={`${styles.site} ${shellStyles.shell}`} id="top">
       <a className={styles.skipLink} href="#main-content">
         Skip to content
       </a>
