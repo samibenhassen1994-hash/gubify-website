@@ -11,7 +11,7 @@ const actions = [
 
 export default function PrivateGubsSection() {
   return (
-    <section className={styles.storySection} aria-labelledby="private-gubs-title">
+    <section className={styles.storySection} id="how-it-works" aria-labelledby="private-gubs-title">
       <div className={styles.storyCopy}>
         <span className={styles.kicker}>Private Gubs</span>
         <h2 id="private-gubs-title">Turn conversation into action.</h2>
