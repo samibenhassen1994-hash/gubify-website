@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-09-09",
+  "terms": {
+    "version": "2026-09-09.2",
+    "url": "https://gubify.com/terms",
+    "requiresAcceptance": true
+  },
+  "privacy": {
+    "version": "2026-09-09.2",
+    "url": "https://gubify.com/privacy",
+    "requiresAcceptance": false
+  },
+  "communityGuidelines": {
+    "version": "2026-09-09.2",
+    "url": "https://gubify.com/guidelines",
+    "requiresAcceptance": true
+  }
+}
