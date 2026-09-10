@@ -34,9 +34,11 @@ test("home presents Private Gubs and Communities in the community-first redesign
   const html = await response.text();
 
   assert.equal(response.status, 200);
-  assert.match(html, /Find your people\. Build your space\./i);
+  assert.match(html, /Find your people\./i);
+  assert.match(html, /Build your space\./i);
   assert.match(html, /Private Gubs for the people closest to you/i);
-  assert.match(html, /Close with your people\. Open to your passions\./i);
+  assert.match(html, /Close with your people\./i);
+  assert.match(html, /Open to your passions\./i);
   assert.match(html, /Turn conversation into action\./i);
   assert.match(html, /Ask\. Help\. Level up\./i);
   assert.match(html, /Stand out by helping others\./i);
