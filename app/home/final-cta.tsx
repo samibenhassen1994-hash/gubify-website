@@ -4,7 +4,8 @@ import PurpleAvatar from "./purple-avatar";
 
 export default function FinalCta() {
   return (
-    <section className={styles.finalCta} aria-labelledby="final-cta-title">
+    <section className={styles.finalCta} id="coming-soon" aria-labelledby="final-cta-title">
+      <span className={styles.anchorTarget} id="about" aria-hidden="true" />
       <div className={styles.finalAvatarLeft}><PurpleAvatar variant="blob" expression="happy" /></div>
       <div className={styles.finalAvatarRight}><PurpleAvatar variant="sprout" expression="proud" /></div>
       <div>
