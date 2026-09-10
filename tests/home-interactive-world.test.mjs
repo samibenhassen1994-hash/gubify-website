@@ -97,6 +97,17 @@ test("home renders the interactive Gubify world contract", async () => {
   assert.match(html, /Shared Budget/i);
   assert.match(html, /Best Answer/i);
   assert.match(html, /Leaderboard/i);
+
+  const phoneModeSwitches = html.match(/Choose Gubify demo mode/g) ?? [];
+  assert.equal(phoneModeSwitches.length, 1, "homepage should render exactly one interactive phone");
+
+  assert.match(html, /Private Gubs or Communities\?/i);
+  assert.match(html, /Inside a Private Gub/i);
+  assert.match(html, /Inside a Community/i);
+  assert.match(html, /How Best Answer works/i);
+  assert.match(html, /How members stand out/i);
+  assert.match(html, /Choose your path/i);
+
   assert.doesNotMatch(html, /Launching 15 September 2026/i);
   assert.doesNotMatch(html, /launch countdown/i);
   assert.doesNotMatch(html, /Group Goals/i);
