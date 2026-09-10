@@ -30,10 +30,10 @@ export default function AskDemo() {
           );
         })}
       </div>
-      <div className={styles.bigXp} aria-live="polite">
+      <div className={styles.xpPanel} aria-live="polite">
         <div><span>Level 7</span><strong>{best === null ? "620 XP" : "+140 XP · 760 XP"}</strong></div>
-        <div className={styles.bigXpTrack}><i style={{ width: `${progress}%` }} /></div>
-        <small>{best === null ? "Choose the most helpful reply." : "Best Answer selected — contribution rewarded."}</small>
+        <div className={styles.xpTrack}><i style={{ width: `${progress}%` }} /></div>
+        <p>{best === null ? "Choose the most helpful reply." : "Best Answer selected — contribution rewarded."}</p>
         {best !== null && <button type="button" onClick={() => setBest(null)}>Try again</button>}
       </div>
     </div>
