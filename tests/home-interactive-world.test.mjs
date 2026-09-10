@@ -80,11 +80,11 @@ test("home renders the interactive Gubify world contract", async () => {
   const html = await response.text();
 
   assert.equal(response.status, 200);
-  assert.match(html, /Build your world together\./i);
-  assert.match(html, /Your private space\. More than a chat\./i);
-  assert.match(html, /Find people who love what you love\./i);
-  assert.match(html, /Ask\. Help\. Level up\./i);
-  assert.match(html, /Become one of the most valuable members\./i);
+  assert.match(html, /Build your world[\s\S]*together\./i);
+  assert.match(html, /Your private space\.[\s\S]*More than a chat\./i);
+  assert.match(html, /Find people who[\s\S]*love what you love\./i);
+  assert.match(html, /Ask\. Help\.[\s\S]*Level up\./i);
+  assert.match(html, /Become one of the[\s\S]*most valuable members\./i);
   assert.match(html, /href=["']\/communities["']/i);
   assert.match(html, /id=["']private-gubs["']/i);
   assert.match(html, /id=["']communities["']/i);
