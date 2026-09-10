@@ -1,5 +1,4 @@
 import Link from "next/link";
-import InteractivePhone from "./interactive-phone";
 import styles from "./home.module.css";
 
 export default function CommunitiesSection() {
@@ -17,7 +16,6 @@ export default function CommunitiesSection() {
           <div className={styles.sceneBubble}><b>✈</b>Travel</div>
           <div className={styles.sceneBubble}><b>✦</b>Anime</div>
           <div className={styles.sceneBubble}><b>♥</b>Fitness</div>
-          <InteractivePhone compact initialMode="community" ariaLabel="Interactive Community discovery demo" />
         </div>
 
         <div className={styles.sectionCopy}>
@@ -27,6 +25,15 @@ export default function CommunitiesSection() {
             Search by interest, open a Community, join the conversation and use Ask when you need a useful answer.
             Helpful members build XP, level up and become recognizable inside their Community.
           </p>
+          <div className={styles.whiteInfoCard}>
+            <h3>Inside a Community</h3>
+            <ul>
+              <li>Discover spaces built around your interests.</li>
+              <li>Join, chat and meet new people.</li>
+              <li>Ask questions and help with useful answers.</li>
+              <li>Earn XP, level up and build recognition.</li>
+            </ul>
+          </div>
           <p className={styles.storyPath}>Discover → Join → Chat → Ask → Help → Grow</p>
           <div className={styles.featureLine}>
             <span>Discover interests</span><span>Join Communities</span><span>Community chat</span><span>Ask questions</span><span>Level up</span>
