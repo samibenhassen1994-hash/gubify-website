@@ -1,6 +1,6 @@
 export const BETA_GOAL = 10_000;
 export const CONSENT_VERSION = "pre-register-v1";
-export const PRIVACY_POLICY_VERSION = "2026-07-29";
+export const PRIVACY_POLICY_VERSION = "2026-09-09.2";
 export const DEVICE_INTERESTS = ["android", "ios", "both", "other"] as const;
 
 export type DeviceInterest = (typeof DEVICE_INTERESTS)[number];
