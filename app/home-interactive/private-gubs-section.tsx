@@ -1,4 +1,5 @@
 import styles from "./home.module.css";
+import refineStyles from "./refinement.module.css";
 
 const privateFeatures = ["Chat together", "Organize tasks", "Plan events", "Vote on proposals", "Manage a shared budget"];
 
@@ -14,7 +15,7 @@ export default function PrivateGubsSection() {
             Keep your closest people in one private Gub. Talk naturally, then turn the things you decide into Tasks,
             Events, Proposals and Shared Budgets without losing the conversation around them.
           </p>
-          <div className={styles.whiteInfoCard}>
+          <div className={refineStyles.whiteInfoCard}>
             <h3>Inside a Private Gub</h3>
             <ul>
               <li>Chat with the people closest to you.</li>
@@ -36,7 +37,7 @@ export default function PrivateGubsSection() {
           <div className={styles.sceneBubble}><b>📅</b>Events</div>
           <div className={styles.sceneBubble}><b>◉</b>Voting</div>
           <div className={styles.sceneBubble}><b>€</b>Budget</div>
-          <img className={styles.sceneAvatar} src="/home/avatars/avatar-nano.png" alt="" />
+          <img className={`${styles.sceneAvatar} ${refineStyles.avatarClean}`} src="/home/avatars/avatar-nano.png" alt="" />
         </div>
       </div>
     </section>
