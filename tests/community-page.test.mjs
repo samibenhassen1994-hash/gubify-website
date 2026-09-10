@@ -4,6 +4,8 @@ import test from "node:test";
 
 const imageUrl =
   "https://res.cloudinary.com/s3yauoza/image/upload/v42/community_abc123.jpg";
+const socialImageUrl =
+  "https://res.cloudinary.com/s3yauoza/image/upload/c_fill,w_1200,h_630,q_auto,f_jpg/v42/community_abc123.jpg";
 
 const baseEnv = {
   FIREBASE_PROJECT_ID: "gubify-a3e2c",
@@ -112,7 +114,13 @@ test("renders one public Community request with image and complete metadata", as
       assert.match(html, /<meta[^>]*property=["']og:url["'][^>]*content=["']https:\/\/gubify\.com\/community\/football-italia-image["']/i);
       assert.match(html, /<meta[^>]*property=["']og:site_name["'][^>]*content=["']Gubify["']/i);
       assert.match(html, /<meta[^>]*property=["']og:type["'][^>]*content=["']website["']/i);
-      assert.match(html, /<meta[^>]*property=["']og:image["'][^>]*content=["']https:\/\/res\.cloudinary\.com\/s3yauoza\/image\/upload\/v42\/community_abc123\.jpg["']/i);
+      assert.match(html, new RegExp(`<meta(?=[^>]*property=["']og:image["'])(?=[^>]*content=["']${socialImageUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'])[^>]*>`, "i"));
+      assert.match(html, /<meta(?=[^>]*property=["']og:image:width["'])(?=[^>]*content=["']1200["'])[^>]*>/i);
+      assert.match(html, /<meta(?=[^>]*property=["']og:image:height["'])(?=[^>]*content=["']630["'])[^>]*>/i);
+      assert.match(html, /<meta(?=[^>]*property=["']og:image:type["'])(?=[^>]*content=["']image\/jpeg["'])[^>]*>/i);
+      assert.match(html, /<meta(?=[^>]*property=["']og:image:alt["'])(?=[^>]*content=["']Football Italia Community["'])[^>]*>/i);
+      assert.match(html, /<meta(?=[^>]*name=["']twitter:card["'])(?=[^>]*content=["']summary_large_image["'])[^>]*>/i);
+      assert.match(html, new RegExp(`<meta(?=[^>]*name=["']twitter:image["'])(?=[^>]*content=["']${socialImageUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'])[^>]*>`, "i"));
 });
 
 test("renders a Community without an image or Open Graph image metadata", async () => {
@@ -136,6 +144,7 @@ test("renders a Community without an image or Open Graph image metadata", async 
       assert.match(html, /<h1[^>]*>Football Italia<\/h1>/i);
       assert.doesNotMatch(html, /<img\b/i);
       assert.doesNotMatch(html, /property=["']og:image["']/i);
+      assert.doesNotMatch(html, /name=["']twitter:image["']/i);
       assert.match(html, /<button(?=[^>]*disabled)[^>]*>Entra nella community<\/button>/i);
 });
 
