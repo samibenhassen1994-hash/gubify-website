@@ -7,7 +7,11 @@ type GubPhoneProps = {
 
 export default function GubPhone({ compact = false }: GubPhoneProps) {
   return (
-    <div className={`${styles.phoneWrap} ${compact ? styles.phoneCompact : ""}`.trim()} aria-label="Private Gub app preview">
+    <div
+      className={`${styles.phoneWrap} ${compact ? styles.phoneCompact : ""}`.trim()}
+      role="group"
+      aria-label="Private Gub app preview"
+    >
       <div className={styles.phoneShell}>
         <div className={styles.phoneTop} aria-hidden="true">
           <span>9:41</span>
