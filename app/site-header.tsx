@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const navigationLinks = [
   { href: "/#features", label: "Features", desktop: true, mobile: true },
   { href: "/#how-it-works", label: "How it works", desktop: true, mobile: true },
-  { href: "/#communities", label: "Communities", desktop: true, mobile: true },
+  { href: "/communities", label: "Explore Communities", desktop: true, mobile: true },
   { href: "/gallery", label: "Gallery", desktop: true, mobile: true },
   { href: "/fundraising", label: "Support us", desktop: true, mobile: false },
   { href: "/support", label: "Contact Us", desktop: true, mobile: true },

@@ -279,11 +279,21 @@ test("home renders accessible desktop and mobile navigation", async () => {
   );
   assert.match(
     html,
+    /<nav[^>]*aria-label=["']Main navigation["'][^>]*>[\s\S]*?href=["']\/communities["'][^>]*>Explore Communities<\/a>[\s\S]*?<\/nav>/i,
+  );
+  assert.match(
+    html,
     /<button(?=[^>]*aria-label=["']Open navigation menu["'])(?=[^>]*aria-expanded=["']false["'])(?=[^>]*aria-controls=["']mobile-navigation["'])[^>]*>/i,
   );
   assert.match(
     html,
-    /<div(?=[^>]*id=["']mobile-navigation["'])(?=[^>]*role=["']dialog["'])(?=[^>]*aria-modal=["']true["'])(?=[^>]*aria-label=["']Mobile navigation["'])[^>]*>[\s\S]*?aria-label=["']Close navigation menu["'][\s\S]*?href=["']\/support["'][^>]*>Contact Us<\/a>[\s\S]*?href=["']\/pre-register["'][^>]*>Pre-register<\/a>[\s\S]*?href=["']\/privacy["'][^>]*>Privacy Policy<\/a>[\s\S]*?href=["']\/terms["'][^>]*>Terms of Service<\/a>[\s\S]*?<\/div>/i,
+    /<div(?=[^>]*id=["']mobile-navigation["'])(?=[^>]*role=["']dialog["'])(?=[^>]*aria-modal=["']true["'])(?=[^>]*aria-label=["']Mobile navigation["'])[^>]*>[\s\S]*?aria-label=["']Close navigation menu["'][\s\S]*?href=["']\/communities["'][^>]*>Explore Communities<\/a>[\s\S]*?href=["']\/support["'][^>]*>Contact Us<\/a>[\s\S]*?href=["']\/pre-register["'][^>]*>Pre-register<\/a>[\s\S]*?href=["']\/privacy["'][^>]*>Privacy Policy<\/a>[\s\S]*?href=["']\/terms["'][^>]*>Terms of Service<\/a>[\s\S]*?<\/div>/i,
+  );
+  assert.match(html, /href=["']\/communities["'][^>]*>Explore Communities<\/a>/i);
+  assert.doesNotMatch(html, /1,248 members/i);
+  assert.match(
+    await readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    /\.community-join-button\s*\{[^}]*display:\s*flex/s,
   );
 });
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import LegalFooter from "./legal-footer";
 import SiteHeader from "./site-header";
@@ -449,33 +450,21 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="community-preview" aria-label="Preview of the Calabria Creators public community">
+          <div className="community-preview" aria-label="Explore Gubify public Communities">
             <span className="community-preview-glow" aria-hidden="true" />
             <div className="community-preview-top">
-              <span className="community-logo" aria-hidden="true">CC</span>
+              <span className="community-logo" aria-hidden="true">G</span>
               <span className="community-public-badge">Public Community</span>
             </div>
-            <h3>Calabria Creators</h3>
-            <div className="community-members">
-              <span className="community-avatar community-avatar-one" aria-hidden="true">A</span>
-              <span className="community-avatar community-avatar-two" aria-hidden="true">M</span>
-              <span className="community-avatar community-avatar-three" aria-hidden="true">L</span>
-              <strong>1,248 members</strong>
-            </div>
+            <h3>Discover a place to belong</h3>
             <p>
-              A place for creators, developers and people building new ideas in
-              Calabria.
+              Explore public Communities around shared interests, ideas and
+              the people you want to meet.
             </p>
-            <div className="community-topics" aria-label="Community topics">
-              <span>Startups</span>
-              <span>Design</span>
-              <span>Technology</span>
-              <span>Local events</span>
-            </div>
-            <button className="community-join-button" type="button" disabled>
-              Join Community
-            </button>
-            <small>Community experiences are coming to Gubify over time.</small>
+            <Link className="community-join-button" href="/communities">
+              Explore Communities <span aria-hidden="true">→</span>
+            </Link>
+            <small>Find public spaces built around what matters to you.</small>
           </div>
         </div>
 
