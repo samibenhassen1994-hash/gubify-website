@@ -13,6 +13,13 @@ export default function Hero() {
           Create private spaces with the people you already know, or discover Communities built around what you love.
           Try the phone: every control in the demo works.
         </p>
+        <div className={styles.whiteInfoCard}>
+          <h3>Private Gubs or Communities?</h3>
+          <div className={styles.infoColumns}>
+            <div><strong>Private Gubs</strong><span>Chat, Tasks, Events, Proposals and Shared Budget with people you already know.</span></div>
+            <div><strong>Communities</strong><span>Discover people by interest, Ask questions, earn XP and grow your reputation.</span></div>
+          </div>
+        </div>
         <div className={styles.ctaRow}>
           <a className={styles.primaryCta} href="#private-gubs">See Private Gubs</a>
           <Link className={styles.secondaryCta} href="/communities">Explore Communities</Link>
