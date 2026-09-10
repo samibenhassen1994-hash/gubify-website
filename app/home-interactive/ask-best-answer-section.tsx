@@ -1,5 +1,6 @@
 import AskDemo from "./ask-demo";
 import styles from "./home.module.css";
+import refineStyles from "./refinement.module.css";
 
 export default function AskBestAnswerSection() {
   return (
@@ -12,7 +13,7 @@ export default function AskBestAnswerSection() {
             Community questions are built for useful answers. Pick the reply that solves the problem best and that
             contribution becomes a Best Answer, rewarding the member with XP.
           </p>
-          <div className={styles.whiteInfoCard}>
+          <div className={refineStyles.whiteInfoCard}>
             <h3>How Best Answer works</h3>
             <ul>
               <li>A member asks a question.</li>
@@ -27,7 +28,7 @@ export default function AskBestAnswerSection() {
           <p className={styles.storyPath}>Great answers stand out. Your contribution matters.</p>
         </div>
         <div className={styles.reputationDemo}>
-          <img className={styles.sceneAvatar} src="/home/avatars/avatar-bolla.png" alt="" />
+          <img className={`${styles.sceneAvatar} ${refineStyles.avatarClean}`} src="/home/avatars/avatar-bolla.png" alt="" />
           <AskDemo />
         </div>
       </div>
