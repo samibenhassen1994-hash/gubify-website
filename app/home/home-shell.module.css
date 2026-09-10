@@ -1,0 +1,13 @@
+.shell :global(.mobile-menu-button span) {
+  background: #ffffff;
+}
+
+.shell :global(.mobile-menu-button:focus-visible),
+.shell :global(.mobile-menu-close:focus-visible) {
+  outline: 3px solid #ffffff;
+  outline-offset: 4px;
+}
+
+.shell :global(.site-header) {
+  color: #ffffff;
+}
