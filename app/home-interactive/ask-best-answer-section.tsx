@@ -12,6 +12,15 @@ export default function AskBestAnswerSection() {
             Community questions are built for useful answers. Pick the reply that solves the problem best and that
             contribution becomes a Best Answer, rewarding the member with XP.
           </p>
+          <div className={styles.whiteInfoCard}>
+            <h3>How Best Answer works</h3>
+            <ul>
+              <li>A member asks a question.</li>
+              <li>The Community replies with possible solutions.</li>
+              <li>The most helpful reply is selected as Best Answer.</li>
+              <li>The author earns XP and progresses toward the next level.</li>
+            </ul>
+          </div>
           <div className={styles.featureLine}>
             <span>Ask a question</span><span>Compare replies</span><span>Select Best Answer</span><span>Earn XP</span><span>Level up</span>
           </div>
