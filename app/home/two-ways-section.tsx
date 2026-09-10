@@ -6,7 +6,8 @@ const communityFeatures = ["Discover", "Ask", "Best Answer", "Level Up"];
 
 export default function TwoWaysSection() {
   return (
-    <section className={styles.twoWays} id="two-ways" aria-labelledby="two-ways-title">
+    <section className={styles.twoWays} id="features" aria-labelledby="two-ways-title">
+      <span className={styles.anchorTarget} id="two-ways" aria-hidden="true" />
       <div className={styles.sectionHeading}>
         <span className={styles.kicker}>Two sides of Gubify</span>
         <h2 id="two-ways-title">Close with your people. <span>Open to your passions.</span></h2>
