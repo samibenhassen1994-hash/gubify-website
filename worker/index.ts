@@ -176,7 +176,11 @@ const worker = {
     // independently to every message in a delivered batch. Process at most
     // one FANOUT message and retry the remainder so the 40-call budget holds
     // even if an external Queue configuration later uses batches above one.
-    await dispatchPushQueueBatch(batch, (message) => handleFanoutMessage(message, env));
+    await dispatchPushQueueBatch(
+      batch,
+      (message) => handleFanoutMessage(message, env),
+      (messages) => env.PUSH_FANOUT_QUEUE.sendBatch(messages.map((body) => ({ body }))),
+    );
   },
 };
 

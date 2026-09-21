@@ -1,6 +1,8 @@
 const MAX_EVENT_KEY_BYTES = 1500;
 const MAX_IDENTIFIER_LENGTH = 256;
 const MAX_CURSOR_LENGTH = 4096;
+export const MAX_QUEUE_BATCH_MESSAGES = 100;
+export const MAX_FANOUT_PROCESSING_SUBREQUESTS = 39;
 
 export interface FanoutMessage {
   kind: "fanout";
@@ -25,6 +27,10 @@ export interface PushQueueBatchMessage {
 
 export interface PushQueueBatch {
   messages: PushQueueBatchMessage[];
+}
+
+export interface PushQueueBatchDispatchResult {
+  externalSubrequests: number;
 }
 
 export class PushQueueMessageError extends Error {
@@ -113,9 +119,15 @@ export function deliveryMessage(eventKey: string, recipientUid: string): Deliver
 
 export async function dispatchPushQueueBatch(
   batch: PushQueueBatch,
-  consumeFanout: (message: FanoutMessage) => Promise<unknown>,
-): Promise<void> {
+  consumeFanout: (message: FanoutMessage) => Promise<{ externalSubrequests: number }>,
+  deferFanouts: (messages: FanoutMessage[]) => Promise<void>,
+): Promise<PushQueueBatchDispatchResult> {
+  if (!Array.isArray(batch.messages) || batch.messages.length > MAX_QUEUE_BATCH_MESSAGES) {
+    throw new PushQueueMessageError();
+  }
+  let processingSubrequests = 0;
   let processedFanout = false;
+  const deferred: Array<{ queued: PushQueueBatchMessage; message: FanoutMessage }> = [];
   for (const queued of batch.messages) {
     let message: PushQueueMessage;
     try {
@@ -125,17 +137,44 @@ export async function dispatchPushQueueBatch(
       continue;
     }
 
-    if (message.kind === "delivery" || processedFanout) {
+    if (message.kind === "delivery") {
       queued.retry();
+      continue;
+    }
+
+    if (processedFanout) {
+      deferred.push({ queued, message });
       continue;
     }
 
     processedFanout = true;
     try {
-      await consumeFanout(message);
+      const result = await consumeFanout(message);
+      if (!Number.isSafeInteger(result.externalSubrequests)
+        || result.externalSubrequests < 0
+        || result.externalSubrequests > MAX_FANOUT_PROCESSING_SUBREQUESTS) {
+        throw new PushQueueMessageError();
+      }
+      processingSubrequests = result.externalSubrequests;
       queued.ack();
     } catch {
+      // A failed consumer may have used its full allowance before throwing.
+      processingSubrequests = MAX_FANOUT_PROCESSING_SUBREQUESTS;
       queued.retry();
     }
   }
+
+  if (deferred.length === 0) {
+    return { externalSubrequests: processingSubrequests };
+  }
+
+  try {
+    await deferFanouts(deferred.map(({ message }) => message));
+    for (const { queued } of deferred) queued.ack();
+  } catch {
+    // A failed durable deferral retains originals. Only this outage path
+    // consumes a retry attempt; accepted deferrals never do.
+    for (const { queued } of deferred) queued.retry();
+  }
+  return { externalSubrequests: processingSubrequests + 1 };
 }

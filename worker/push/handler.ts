@@ -24,11 +24,15 @@ export interface PushQueue<Message = unknown> {
   send(message: Message): Promise<void>;
 }
 
+export interface PushBatchQueue<Message = unknown> extends PushQueue<Message> {
+  sendBatch(messages: Array<{ body: Message }>): Promise<void>;
+}
+
 export interface PushEventEnv {
   FIREBASE_PROJECT_ID: string;
   FIREBASE_CLIENT_EMAIL: string;
   FIREBASE_PRIVATE_KEY: string;
-  PUSH_FANOUT_QUEUE: PushQueue<FanoutMessage>;
+  PUSH_FANOUT_QUEUE: PushBatchQueue<FanoutMessage>;
   PUSH_DELIVERY_QUEUE: PushQueue<DeliveryMessage>;
   PUSH_EVENTS_RATE_LIMITER: PushRateLimiter;
 }
@@ -124,7 +128,13 @@ export function createPushEventRequestHandler(
       const firestore = await createFirestoreClient(env);
       const validated = await validatePushEvent(eventRequest, user.uid, firestore);
       const plan = await createEventPlanStore(firestore).ensureEventPlan(validated);
-      if (plan.fanout.completed) return acceptedResponse(plan.eventKey);
+      if (plan.fanout.completed) {
+        await env.PUSH_FANOUT_QUEUE.send(fanoutMessage(
+          plan.eventKey,
+          plan.fanout.reconcileCursor ?? null,
+        ));
+        return acceptedResponse(plan.eventKey);
+      }
 
       await env.PUSH_FANOUT_QUEUE.send(fanoutMessage(plan.eventKey, plan.fanout.cursor));
       // Queue acceptance and Firestore status are not atomic. A failed patch
@@ -142,7 +152,7 @@ export function createPushEventRequestHandler(
         },
         {
           updateMask: ["fanout.status", "fanout.attempts"],
-          precondition: { exists: true },
+          precondition: { updateTime: plan.updateTime },
         },
       );
       return acceptedResponse(plan.eventKey);

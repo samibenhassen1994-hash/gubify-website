@@ -11,10 +11,11 @@ import {
   type FirestoreRestClient,
   type FirestoreValue,
 } from "./firestore-rest.ts";
-import type { PushQueue } from "./handler.ts";
+import type { PushBatchQueue, PushQueue } from "./handler.ts";
 import {
   deliveryMessage,
   fanoutMessage,
+  MAX_FANOUT_PROCESSING_SUBREQUESTS,
   parsePushQueueMessage,
   type DeliveryMessage,
   type FanoutMessage,
@@ -32,7 +33,7 @@ export interface FanoutConsumerEnv {
   FIREBASE_PROJECT_ID: string;
   FIREBASE_CLIENT_EMAIL: string;
   FIREBASE_PRIVATE_KEY: string;
-  PUSH_FANOUT_QUEUE: PushQueue<FanoutMessage>;
+  PUSH_FANOUT_QUEUE: PushBatchQueue<FanoutMessage>;
   PUSH_DELIVERY_QUEUE: PushQueue<DeliveryMessage>;
 }
 
@@ -59,6 +60,7 @@ interface RecipientState {
   status: "pending" | "enqueued" | "completed";
   attempts: number;
   enqueuedAt?: Date;
+  updateTime: string;
 }
 
 interface DiscoveryPage {
@@ -84,7 +86,7 @@ class ExternalSubrequestBudget {
   used = 0;
 
   async run<T>(operation: () => Promise<T>): Promise<T> {
-    if (this.used >= MAX_EXTERNAL_SUBREQUESTS) {
+    if (this.used >= MAX_FANOUT_PROCESSING_SUBREQUESTS) {
       throw new FanoutSubrequestBudgetError();
     }
     this.used += 1;
@@ -172,6 +174,9 @@ function parseStoredPlan(
   const fanout = fields.fanout;
   requireCondition(typeof fanout.status === "string"
     && (fanout.cursor === null || typeof fanout.cursor === "string")
+    && (fanout.reconcileCursor === undefined
+      || fanout.reconcileCursor === null
+      || typeof fanout.reconcileCursor === "string")
     && typeof fanout.attempts === "number"
     && Number.isSafeInteger(fanout.attempts)
     && fanout.attempts >= 0
@@ -188,6 +193,9 @@ function parseStoredPlan(
         cursor: fanout.cursor as string | null,
         attempts: fanout.attempts,
         completed: fanout.completed,
+        ...(fanout.reconcileCursor === undefined
+          ? {}
+          : { reconcileCursor: fanout.reconcileCursor as string | null }),
       },
     },
     updateTime: document.updateTime,
@@ -276,6 +284,7 @@ function parseRecipientState(
   const path = `pushDeliveryEvents/${eventKey}/recipients/${recipientUid}`;
   requireCondition(document
     && document.name === exactDocumentName(firestore, path)
+    && typeof document.updateTime === "string"
     && document.fields.schemaVersion === 1
     && document.fields.eventKey === eventKey
     && document.fields.recipientUid === recipientUid
@@ -290,6 +299,7 @@ function parseRecipientState(
   return {
     status: document.fields.status,
     attempts: document.fields.attempts,
+    updateTime: document.updateTime,
     ...(enqueuedAt instanceof Date ? { enqueuedAt } : {}),
   };
 }
@@ -309,7 +319,8 @@ async function ensureRecipient(
       attempts: 0,
       createdAt: SERVER_TIMESTAMP,
     });
-    return { status: "pending", attempts: 0 };
+    // Read back the create version so Queue acceptance is followed by a
+    // compare-and-set, never an unconditional status regression.
   } catch (error) {
     if (!(error instanceof FirestoreRestError) || error.status !== 409) throw error;
   }
@@ -337,6 +348,26 @@ async function enqueueRecipient(
   nowMilliseconds: number,
 ): Promise<void> {
   const state = await ensureRecipient(firestore, eventKey, recipientUid);
+  await enqueueRecipientState(
+    firestore,
+    queue,
+    budget,
+    eventKey,
+    recipientUid,
+    state,
+    nowMilliseconds,
+  );
+}
+
+async function enqueueRecipientState(
+  firestore: FirestoreRestClient,
+  queue: PushQueue<DeliveryMessage>,
+  budget: ExternalSubrequestBudget,
+  eventKey: string,
+  recipientUid: string,
+  state: RecipientState,
+  nowMilliseconds: number,
+): Promise<void> {
   if (!needsDeliveryEnqueue(state, nowMilliseconds)) return;
   await budget.run(() => queue.send(deliveryMessage(eventKey, recipientUid)));
   await patchDocument(
@@ -349,9 +380,85 @@ async function enqueueRecipient(
     },
     {
       updateMask: ["status", "attempts", "enqueuedAt"],
-      precondition: { exists: true },
+      precondition: { updateTime: state.updateTime },
     },
   );
+}
+
+async function reconcileCompletedPlan(
+  firestore: FirestoreRestClient,
+  env: FanoutConsumerEnv,
+  budget: ExternalSubrequestBudget,
+  stored: StoredPlan,
+  message: FanoutMessage,
+  nowMilliseconds: number,
+): Promise<FanoutResult> {
+  const reconciliationCursor = stored.plan.fanout.reconcileCursor ?? null;
+  const messageCursor = message.cursor ?? null;
+  if (messageCursor !== reconciliationCursor) {
+    await budget.run(() => env.PUSH_FANOUT_QUEUE.send(
+      fanoutMessage(message.eventKey, reconciliationCursor),
+    ));
+    return {
+      externalSubrequests: budget.used,
+      recipientsProcessed: 0,
+      completed: true,
+      stale: true,
+    };
+  }
+
+  const collectionPath = `pushDeliveryEvents/${message.eventKey}/recipients`;
+  const page = await listDocuments(firestore, collectionPath, {
+    pageSize: RECIPIENT_PAGE_SIZE,
+    pageToken: reconciliationCursor ?? undefined,
+    orderBy: "__name__",
+    mask: ["schemaVersion", "eventKey", "recipientUid", "status", "attempts", "enqueuedAt"],
+  });
+  let recipientsProcessed = 0;
+  for (const document of page.documents) {
+    const recipientUid = documentId(firestore, collectionPath, document);
+    const state = parseRecipientState(
+      firestore,
+      message.eventKey,
+      recipientUid,
+      document,
+    );
+    await enqueueRecipientState(
+      firestore,
+      env.PUSH_DELIVERY_QUEUE,
+      budget,
+      message.eventKey,
+      recipientUid,
+      state,
+      nowMilliseconds,
+    );
+    recipientsProcessed += 1;
+  }
+
+  const nextCursor = page.nextPageToken ?? null;
+  if (nextCursor !== reconciliationCursor) {
+    await patchDocument(
+      firestore,
+      `pushDeliveryEvents/${message.eventKey}`,
+      { fanout: { reconcileCursor: nextCursor } },
+      {
+        updateMask: ["fanout.reconcileCursor"],
+        precondition: { updateTime: stored.updateTime },
+      },
+    );
+  }
+  if (nextCursor !== null) {
+    await budget.run(() => env.PUSH_FANOUT_QUEUE.send(
+      fanoutMessage(message.eventKey, nextCursor),
+    ));
+  }
+
+  return {
+    externalSubrequests: budget.used,
+    recipientsProcessed,
+    completed: true,
+    stale: false,
+  };
 }
 
 function countFirestoreClient(
@@ -395,12 +502,7 @@ export function createFanoutConsumer(
     );
 
     if (stored.plan.fanout.completed) {
-      return {
-        externalSubrequests: budget.used,
-        recipientsProcessed: 0,
-        completed: true,
-        stale: false,
-      };
+      return reconcileCompletedPlan(firestore, env, budget, stored, message, now());
     }
 
     const messageCursor = message.cursor ?? null;
@@ -445,6 +547,7 @@ export function createFanoutConsumer(
           cursor: page.nextCursor,
           attempts: stored.plan.fanout.attempts + 1,
           completed,
+          reconcileCursor: null,
         },
       },
       {
@@ -453,11 +556,9 @@ export function createFanoutConsumer(
       },
     );
 
-    if (!completed) {
-      await budget.run(() => env.PUSH_FANOUT_QUEUE.send(
-        fanoutMessage(message.eventKey, page.nextCursor),
-      ));
-    }
+    await budget.run(() => env.PUSH_FANOUT_QUEUE.send(
+      fanoutMessage(message.eventKey, completed ? null : page.nextCursor),
+    ));
 
     return {
       externalSubrequests: budget.used,

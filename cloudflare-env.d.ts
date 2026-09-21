@@ -6,6 +6,7 @@ interface Fetcher {
 
 interface PushQueueBinding<Message = unknown> {
   send(message: Message): Promise<void>;
+  sendBatch(messages: Array<{ body: Message }>): Promise<void>;
 }
 
 interface PushFanoutQueueMessage {

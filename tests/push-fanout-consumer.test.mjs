@@ -196,6 +196,7 @@ function queueFake() {
   const accepted = [];
   let failures = 0;
   let attempts = 0;
+  let onAccepted;
   return {
     binding: {
       async send(message) {
@@ -205,11 +206,13 @@ function queueFake() {
           throw new Error("queue unavailable");
         }
         accepted.push(structuredClone(message));
+        onAccepted?.(message);
       },
     },
     accepted,
     get attempts() { return attempts; },
     fail(count = 1) { failures += count; },
+    onAccepted(callback) { onAccepted = callback; },
   };
 }
 
@@ -221,6 +224,7 @@ function planFields({
   cursor = null,
   completed = false,
   attempts = 0,
+  reconcileCursor,
 }) {
   return {
     schemaVersion: 1,
@@ -232,7 +236,13 @@ function planFields({
     data: {},
     recipientSource,
     createdAt: new Date("2026-09-21T10:00:00.000Z"),
-    fanout: { status: completed ? "completed" : "pending", cursor, attempts, completed },
+    fanout: {
+      status: completed ? "completed" : "pending",
+      cursor,
+      attempts,
+      completed,
+      ...(reconcileCursor === undefined ? {} : { reconcileCursor }),
+    },
   };
 }
 
@@ -360,7 +370,7 @@ test("FANOUT join-request discovery uses only owner and active live Platform Adm
   );
 });
 
-test("FANOUT duplicate redelivery after completion is a no-op", async () => {
+test("FANOUT duplicate redelivery after completion performs bounded reconciliation without duplicate DELIVERY", async () => {
   const db = memoryFirestore();
   const fanoutQueue = queueFake();
   const deliveryQueue = queueFake();
@@ -375,7 +385,48 @@ test("FANOUT duplicate redelivery after completion is a no-op", async () => {
   const callCount = db.calls.length;
   const duplicate = await consume({ kind: "fanout", eventKey }, env(fanoutQueue, deliveryQueue));
   assert.equal(duplicate.completed, true);
-  assert.equal(db.calls.length, callCount + 1, "redelivery only re-reads the plan");
+  assert.equal(db.calls.length, callCount + 2, "redelivery reads the plan and one bounded recipient page");
+  assert.equal(deliveryQueue.accepted.length, 1);
+});
+
+test("FANOUT completed plans reconcile an earlier stale recipient with an independent bounded cursor", async () => {
+  const db = memoryFirestore();
+  const fanoutQueue = queueFake();
+  const deliveryQueue = queueFake();
+  const eventKey = "proposal_created__g__p";
+  const planPath = `pushDeliveryEvents/${eventKey}`;
+  db.put(planPath, planFields({
+    eventKey,
+    type: "proposal_created",
+    completed: true,
+    recipientSource: { kind: "gub_members", gubId: "g", excludeUid: "creator" },
+  }));
+  for (const uid of ["a-stale", "b-done", "c-done", "d-done", "e-done"]) {
+    db.put(`${planPath}/recipients/${uid}`, {
+      schemaVersion: 1,
+      eventKey,
+      recipientUid: uid,
+      status: uid === "a-stale" ? "enqueued" : "completed",
+      attempts: 1,
+      createdAt: new Date("2026-09-21T10:00:00.000Z"),
+      enqueuedAt: new Date("2026-09-21T10:01:00.000Z"),
+    });
+  }
+
+  const consume = consumer(db);
+  const first = await consume({ kind: "fanout", eventKey }, env(fanoutQueue, deliveryQueue));
+  assert.equal(first.completed, true);
+  assert.deepEqual(deliveryQueue.accepted, [{ kind: "delivery", eventKey, recipientUid: "a-stale" }]);
+  assert.equal(db.decoded(`${planPath}/recipients/a-stale`).fields.attempts, 2);
+  const reconciliationCursor = db.decoded(planPath).fields.fanout.reconcileCursor;
+  assert.match(reconciliationCursor, /^offset:/);
+  assert.deepEqual(fanoutQueue.accepted.at(-1), { kind: "fanout", eventKey, cursor: reconciliationCursor });
+  assert.ok(first.externalSubrequests <= 39);
+
+  await consume(fanoutQueue.accepted.pop(), env(fanoutQueue, deliveryQueue));
+  assert.equal(db.decoded(planPath).fields.fanout.completed, true);
+  assert.equal(db.decoded(planPath).fields.fanout.cursor, null, "discovery cursor remains complete");
+  assert.equal(db.decoded(planPath).fields.fanout.reconcileCursor, null);
   assert.equal(deliveryQueue.accepted.length, 1);
 });
 
@@ -469,6 +520,51 @@ test("FANOUT repairs Queue acceptance followed by recipient status-write failure
   assert.equal(deliveryQueue.accepted.length, 2, "ambiguous acceptance may safely duplicate DELIVERY");
   assert.equal(db.decoded(recipientPath).fields.status, "enqueued");
   assert.equal(db.decoded(recipientPath).fields.attempts, 1);
+});
+
+test("FANOUT enqueue status write cannot regress a concurrently completed recipient", async () => {
+  const db = memoryFirestore();
+  const fanoutQueue = queueFake();
+  const deliveryQueue = queueFake();
+  const eventKey = "task_assigned__g__t";
+  const recipientPath = `pushDeliveryEvents/${eventKey}/recipients/recipient`;
+  db.put(`pushDeliveryEvents/${eventKey}`, planFields({
+    eventKey,
+    recipientSource: { kind: "users", userIds: ["recipient"] },
+  }));
+  putActiveUser(db, "recipient");
+  db.put(recipientPath, {
+    schemaVersion: 1,
+    eventKey,
+    recipientUid: "recipient",
+    status: "pending",
+    attempts: 2,
+    createdAt: new Date("2026-09-21T10:00:00.000Z"),
+  });
+  deliveryQueue.onAccepted(() => {
+    db.put(recipientPath, {
+      schemaVersion: 1,
+      eventKey,
+      recipientUid: "recipient",
+      status: "completed",
+      attempts: 7,
+      createdAt: new Date("2026-09-21T10:00:00.000Z"),
+      completedAt: NOW,
+    });
+  });
+  const consume = consumer(db);
+
+  await assert.rejects(
+    consume({ kind: "fanout", eventKey }, env(fanoutQueue, deliveryQueue)),
+    /firestore request failed/i,
+  );
+  assert.equal(db.decoded(recipientPath).fields.status, "completed");
+  assert.equal(db.decoded(recipientPath).fields.attempts, 7);
+
+  deliveryQueue.onAccepted(undefined);
+  await consume({ kind: "fanout", eventKey }, env(fanoutQueue, deliveryQueue));
+  assert.equal(deliveryQueue.accepted.length, 1);
+  assert.equal(db.decoded(recipientPath).fields.status, "completed");
 });
 
 test("FANOUT repairs an ambiguous cursor write without recreating recipients", async () => {
@@ -569,6 +665,174 @@ test("FANOUT HTTP retries repair plan/enqueue and acceptance/status gaps", async
   assert.equal([...db.documents.keys()].filter((path) => path === "pushDeliveryEvents/task_assigned__g__t").length, 1);
 });
 
+test("FANOUT HTTP status write cannot overwrite concurrent plan completion", async () => {
+  const db = memoryFirestore();
+  const fanoutQueue = queueFake();
+  const deliveryQueue = queueFake();
+  for (const [path, fields] of Object.entries({
+    "users/actor": { displayName: "Actor" },
+    "gubs/g": { ownerId: "owner" },
+    "gubs/g/members/actor": { userId: "actor" },
+    "gubs/g/tasks/t": {
+      gubId: "g",
+      taskId: "t",
+      creatorId: "actor",
+      assignedUserId: "recipient",
+      status: "active",
+      archived: false,
+      completedAt: null,
+      completedBy: null,
+    },
+  })) db.put(path, fields);
+  const planPath = "pushDeliveryEvents/task_assigned__g__t";
+  fanoutQueue.onAccepted(() => {
+    const plan = db.decoded(planPath).fields;
+    db.put(planPath, {
+      ...plan,
+      fanout: { status: "completed", cursor: null, attempts: 7, completed: true },
+    });
+  });
+  const handle = createPushEventRequestHandler({
+    async verifyFirebaseIdToken() { return { uid: "actor", claims: {} }; },
+    async createFirestoreClient() { return db.client; },
+  });
+
+  const response = await handle(new Request("https://gubify.com/api/push/events", {
+    method: "POST",
+    headers: { Authorization: "Bearer test" },
+    body: JSON.stringify({ type: "task_assigned", gubId: "g", taskId: "t" }),
+  }), {
+    ...env(fanoutQueue, deliveryQueue),
+    PUSH_EVENTS_RATE_LIMITER: { async limit() { return { success: true }; } },
+  }, {});
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(db.decoded(planPath).fields.fanout, {
+    status: "completed",
+    cursor: null,
+    attempts: 7,
+    completed: true,
+  });
+});
+
+test("FANOUT HTTP retry enqueues bounded reconciliation for a completed plan", async () => {
+  const db = memoryFirestore();
+  const fanoutQueue = queueFake();
+  const deliveryQueue = queueFake();
+  for (const [path, fields] of Object.entries({
+    "users/actor": { displayName: "Actor" },
+    "gubs/g": { ownerId: "owner" },
+    "gubs/g/members/actor": { userId: "actor" },
+    "gubs/g/tasks/t": {
+      gubId: "g",
+      taskId: "t",
+      creatorId: "actor",
+      assignedUserId: "recipient",
+      status: "active",
+      archived: false,
+      completedAt: null,
+      completedBy: null,
+    },
+  })) db.put(path, fields);
+  const handle = createPushEventRequestHandler({
+    async verifyFirebaseIdToken() { return { uid: "actor", claims: {} }; },
+    async createFirestoreClient() { return db.client; },
+  });
+  const request = () => new Request("https://gubify.com/api/push/events", {
+    method: "POST",
+    headers: { Authorization: "Bearer test" },
+    body: JSON.stringify({ type: "task_assigned", gubId: "g", taskId: "t" }),
+  });
+  const handlerEnv = {
+    ...env(fanoutQueue, deliveryQueue),
+    PUSH_EVENTS_RATE_LIMITER: { async limit() { return { success: true }; } },
+  };
+
+  assert.equal((await handle(request(), handlerEnv, {})).status, 202);
+  fanoutQueue.accepted.length = 0;
+  const planPath = "pushDeliveryEvents/task_assigned__g__t";
+  const plan = db.decoded(planPath).fields;
+  db.put(planPath, {
+    ...plan,
+    fanout: { status: "completed", cursor: null, attempts: 4, completed: true, reconcileCursor: null },
+  });
+
+  assert.equal((await handle(request(), handlerEnv, {})).status, 202);
+  assert.deepEqual(fanoutQueue.accepted, [{ kind: "fanout", eventKey: "task_assigned__g__t" }]);
+  assert.deepEqual(db.decoded(planPath).fields.fanout, {
+    status: "completed",
+    cursor: null,
+    attempts: 4,
+    completed: true,
+    reconcileCursor: null,
+  });
+});
+
+test("FANOUT HTTP repair narrowly refreshes a legitimate Community owner change", async () => {
+  const db = memoryFirestore();
+  const fanoutQueue = queueFake();
+  const deliveryQueue = queueFake();
+  db.put("users/requester", { displayName: "Requester", deletionStatus: "active" });
+  db.put("communities/c", {
+    communityId: "c",
+    ownerId: "old-owner",
+    accessMode: "approval",
+    deletionStatus: "active",
+  });
+  db.put("communities/c/joinRequests/requester", {
+    userId: "requester",
+    status: "pending",
+    createdAt: new Date("2026-09-21T10:00:00.000Z"),
+    requestedAt: new Date("2026-09-21T10:01:00.000Z"),
+    resolvedAt: null,
+    resolvedBy: null,
+  });
+  const handle = createPushEventRequestHandler({
+    async verifyFirebaseIdToken() { return { uid: "requester", claims: {} }; },
+    async createFirestoreClient() { return db.client; },
+  });
+  const request = () => new Request("https://gubify.com/api/push/events", {
+    method: "POST",
+    headers: { Authorization: "Bearer test" },
+    body: JSON.stringify({
+      type: "community_join_request_created",
+      communityId: "c",
+      requesterUid: "requester",
+    }),
+  });
+  const handlerEnv = {
+    ...env(fanoutQueue, deliveryQueue),
+    PUSH_EVENTS_RATE_LIMITER: { async limit() { return { success: true }; } },
+  };
+
+  fanoutQueue.fail();
+  assert.equal((await handle(request(), handlerEnv, {})).status, 503);
+  const planPath = [...db.documents.keys()].find((path) => path.startsWith(
+    "pushDeliveryEvents/community_join_request_created__c__requester__",
+  ));
+  assert.ok(planPath);
+  assert.equal(db.decoded(planPath).fields.recipientSource.ownerId, "old-owner");
+
+  db.put("communities/c", {
+    communityId: "c",
+    ownerId: "new-owner",
+    accessMode: "approval",
+    deletionStatus: "active",
+  });
+  assert.equal((await handle(request(), handlerEnv, {})).status, 202);
+  assert.equal(db.decoded(planPath).fields.recipientSource.ownerId, "new-owner");
+  assert.deepEqual(fanoutQueue.accepted, [{ kind: "fanout", eventKey: planPath.split("/").at(-1) }]);
+
+  const forged = db.decoded(planPath).fields;
+  db.put(planPath, {
+    ...forged,
+    recipientSource: { ...forged.recipientSource, communityId: "forged" },
+  });
+  assert.equal((await handle(request(), handlerEnv, {})).status, 503);
+  assert.equal(db.decoded(planPath).fields.recipientSource.communityId, "forged");
+  assert.equal(fanoutQueue.accepted.length, 1, "identity mismatch must not enqueue or self-heal");
+});
+
 test("FANOUT Queue message parsing rejects malformed cursors and discriminates DELIVERY", () => {
   assert.deepEqual(queueModule.parsePushQueueMessage({ kind: "fanout", eventKey: "event" }), {
     kind: "fanout",
@@ -593,25 +857,57 @@ test("FANOUT Queue message parsing rejects malformed cursors and discriminates D
   ]) assert.throws(() => queueModule.parsePushQueueMessage(malformed), /queue message/i);
 });
 
-test("FANOUT Queue batches process at most one FANOUT within the invocation budget", async () => {
+test("FANOUT Queue batches durably defer untouched FANOUT in one bounded operation", async () => {
+  assert.equal(queueModule.MAX_QUEUE_BATCH_MESSAGES, 100);
   const outcomes = [];
   const queued = [
-    { body: { kind: "fanout", eventKey: "event-a" } },
-    { body: { kind: "fanout", eventKey: "event-b" } },
+    ...Array.from({ length: 98 }, (_, index) => ({
+      body: { kind: "fanout", eventKey: `event-${index}` },
+    })),
     { body: { kind: "delivery", eventKey: "event-a", recipientUid: "recipient" } },
     { body: { kind: "fanout", eventKey: "event-a", cursor: "" } },
   ].map((item, index) => ({
     ...item,
+    ack() { outcomes[index] = "ack"; },
+    retry() { outcomes[index] = "retry"; },
+  }));
+  const consumed = [];
+  const deferred = [];
+
+  const result = await queueModule.dispatchPushQueueBatch(
+    { messages: queued },
+    async (message) => {
+      consumed.push(message);
+      return { externalSubrequests: 39 };
+    },
+    async (messages) => { deferred.push(structuredClone(messages)); },
+  );
+
+  assert.deepEqual(consumed, [{ kind: "fanout", eventKey: "event-0" }]);
+  assert.equal(deferred.length, 1, "97 untouched FANOUT messages use one Queue subrequest");
+  assert.deepEqual(deferred[0], Array.from({ length: 97 }, (_, index) => ({
+    kind: "fanout",
+    eventKey: `event-${index + 1}`,
+  })));
+  assert.deepEqual(outcomes.slice(0, 98), Array.from({ length: 98 }, () => "ack"));
+  assert.deepEqual(outcomes.slice(98), ["retry", "ack"]);
+  assert.equal(result.externalSubrequests, 40);
+});
+
+test("FANOUT Queue deferral failure retries originals instead of acknowledging lost work", async () => {
+  const outcomes = [];
+  const queued = ["event-a", "event-b"].map((eventKey, index) => ({
+    body: { kind: "fanout", eventKey },
     ack() { outcomes.push(`ack:${index}`); },
     retry() { outcomes.push(`retry:${index}`); },
   }));
-  const consumed = [];
 
-  await queueModule.dispatchPushQueueBatch(
+  const result = await queueModule.dispatchPushQueueBatch(
     { messages: queued },
-    async (message) => { consumed.push(message); },
+    async () => ({ externalSubrequests: 3 }),
+    async () => { throw new Error("Queue unavailable"); },
   );
 
-  assert.deepEqual(consumed, [{ kind: "fanout", eventKey: "event-a" }]);
-  assert.deepEqual(outcomes, ["ack:0", "retry:1", "retry:2", "ack:3"]);
+  assert.deepEqual(outcomes, ["ack:0", "retry:1"]);
+  assert.equal(result.externalSubrequests, 4);
 });

@@ -11,6 +11,8 @@ const event = {
 function memoryFirestore() {
   const docs = new Map(); const writes = []; const reads = [];
   let failStatus;
+  let revision = 0;
+  const updateTime = () => `2026-09-21T10:00:${String(++revision).padStart(2, "0")}.000Z`;
   const firestore = {
     projectId: "push-test", accessToken: "mock-token",
     async fetch(input, init) {
@@ -19,9 +21,12 @@ function memoryFirestore() {
         assert.ok(url.pathname.endsWith("/documents:commit"));
         const { writes: [write] } = JSON.parse(init.body); writes.push(write);
         if (failStatus) return new Response(null, { status: failStatus });
-        if (write.currentDocument?.exists === true) {
+        if (write.currentDocument?.exists === true || write.currentDocument?.updateTime) {
           const saved = docs.get(write.update.name);
           assert.ok(saved);
+          if (write.currentDocument.updateTime && write.currentDocument.updateTime !== saved.updateTime) {
+            return new Response(null, { status: 409 });
+          }
           for (const fieldPath of write.updateMask.fieldPaths) {
             const [parent, child] = fieldPath.split(".");
             saved.fields[parent].mapValue.fields[child] =
@@ -31,6 +36,7 @@ function memoryFirestore() {
             assert.equal(transform.setToServerValue, "REQUEST_TIME");
             saved.fields[transform.fieldPath] = { timestampValue: "2026-09-21T10:00:00.123456Z" };
           }
+          saved.updateTime = updateTime();
           return Response.json({ writeResults: [{}], commitTime: "2026-09-21T10:00:00Z" });
         }
         assert.deepEqual(write.currentDocument, { exists: false });
@@ -41,6 +47,7 @@ function memoryFirestore() {
           assert.equal(transform.setToServerValue, "REQUEST_TIME");
           saved.fields[transform.fieldPath] = { timestampValue: "2026-09-21T10:00:00.123456Z" };
         }
+        saved.updateTime = updateTime();
         docs.set(saved.name, saved);
         return Response.json({ writeResults: [{}], commitTime: "2026-09-21T10:00:00Z" });
       }
