@@ -432,6 +432,29 @@ test("Firestore REST rejects an explicitly empty update mask", async () => {
   assert.equal(fetchCalls, 0);
 });
 
+test("Firestore REST permits a deletion-only patch when an explicit nonempty mask makes it safe", async () => {
+  let request;
+  const firestore = client(async (input, init) => {
+    request = { url: new URL(input), init };
+    return Response.json(rawDocument("users/user-1"));
+  });
+
+  await firestoreModule.patchDocument(
+    firestore,
+    "users/user-1",
+    {},
+    { updateMask: ["obsolete", "nested.value"], precondition: { exists: true } },
+  );
+
+  assert.equal(request.init.method, "PATCH");
+  assert.deepEqual(request.url.searchParams.getAll("updateMask.fieldPaths"), [
+    "obsolete",
+    "nested.value",
+  ]);
+  assert.equal(request.url.searchParams.get("currentDocument.exists"), "true");
+  assert.deepEqual(JSON.parse(request.init.body), { fields: {} });
+});
+
 test("Firestore REST keeps explicit deletions when a patch otherwise contains only transforms", async () => {
   let commitBody;
   const firestore = client(async (_input, init) => {
@@ -466,7 +489,7 @@ test("Firestore REST preserves exact updateTime precision through a conditional-
   });
 
   const document = await firestoreModule.getDocument(firestore, "users/user-1");
-  assert.equal(document.updateTime.toISOString(), preciseUpdateTime);
+  assert.equal(document.updateTime, preciseUpdateTime);
   await firestoreModule.patchDocument(
     firestore,
     "users/user-1",
@@ -478,6 +501,34 @@ test("Firestore REST preserves exact updateTime precision through a conditional-
     calls[1].url.searchParams.get("currentDocument.updateTime"),
     preciseUpdateTime,
   );
+});
+
+test("Firestore REST timestamp fields retain ordinary mutable Date encoding semantics", async () => {
+  const calls = [];
+  const firestore = client(async (input, init) => {
+    calls.push({ url: new URL(input), init });
+    if (init.method === "PATCH") {
+      return Response.json(rawDocument("users/user-1"));
+    }
+    return Response.json(rawDocument("users/user-1", {
+      updatedAt: { timestampValue: "2026-09-20T10:02:03.456789Z" },
+    }));
+  });
+
+  const document = await firestoreModule.getDocument(firestore, "users/user-1");
+  const updatedAt = document.fields.updatedAt;
+  assert.ok(updatedAt instanceof Date);
+  updatedAt.setUTCSeconds(4);
+
+  await firestoreModule.patchDocument(
+    firestore,
+    "users/user-1",
+    { updatedAt },
+  );
+
+  assert.deepEqual(JSON.parse(calls[1].init.body), {
+    fields: { updatedAt: { timestampValue: "2026-09-20T10:02:04.456Z" } },
+  });
 });
 
 test("Firestore REST preserves reference and geo point types across decode and encode", async () => {

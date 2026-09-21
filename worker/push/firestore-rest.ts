@@ -56,8 +56,8 @@ export type FirestoreWritableValue =
 export interface FirestoreDocument {
   name: string;
   fields: Record<string, FirestoreValue>;
-  createTime?: Date;
-  updateTime?: Date;
+  createTime?: string;
+  updateTime?: string;
 }
 
 export interface FirestoreRestClient {
@@ -98,8 +98,8 @@ export interface DeleteDocumentOptions {
 }
 
 export interface FirestoreCommitResult {
-  commitTime?: Date;
-  updateTime?: Date;
+  commitTime?: string;
+  updateTime?: string;
   transformResults: FirestoreValue[];
 }
 
@@ -121,7 +121,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function parseTimestamp(value: unknown): Date {
+function timestampText(value: unknown): string {
   if (typeof value !== "string" || !TIMESTAMP_PATTERN.test(value)) {
     return malformed();
   }
@@ -129,13 +129,11 @@ function parseTimestamp(value: unknown): Date {
   if (!Number.isFinite(timestamp.getTime())) {
     return malformed();
   }
-  Object.defineProperty(timestamp, "toISOString", {
-    configurable: false,
-    enumerable: false,
-    value: () => value,
-    writable: false,
-  });
-  return timestamp;
+  return value;
+}
+
+function parseTimestamp(value: unknown): Date {
+  return new Date(timestampText(value));
 }
 
 function decodeBytes(value: unknown): Uint8Array {
@@ -281,8 +279,8 @@ export function decodeDocument(value: unknown): FirestoreDocument {
   return {
     name: value.name,
     fields: decodeFields(value.fields ?? {}),
-    ...(value.createTime === undefined ? {} : { createTime: parseTimestamp(value.createTime) }),
-    ...(value.updateTime === undefined ? {} : { updateTime: parseTimestamp(value.updateTime) }),
+    ...(value.createTime === undefined ? {} : { createTime: timestampText(value.createTime) }),
+    ...(value.updateTime === undefined ? {} : { updateTime: timestampText(value.updateTime) }),
   };
 }
 
@@ -480,7 +478,7 @@ function appendPrecondition(url: URL, precondition?: FirestoreWritePrecondition)
     const updateTime = precondition.updateTime instanceof Date
       ? precondition.updateTime.toISOString()
       : precondition.updateTime;
-    parseTimestamp(updateTime);
+    timestampText(updateTime);
     url.searchParams.set("currentDocument.updateTime", updateTime);
     return;
   }
@@ -502,7 +500,7 @@ function preconditionJson(
     const updateTime = selected.updateTime instanceof Date
       ? selected.updateTime.toISOString()
       : selected.updateTime;
-    parseTimestamp(updateTime);
+    timestampText(updateTime);
     return { updateTime };
   }
   throw new TypeError("Invalid Firestore precondition");
@@ -562,10 +560,10 @@ async function commitWrite(
       ? writeResult.transformResults.map(decodeValue)
       : malformed();
   return {
-    ...(value.commitTime === undefined ? {} : { commitTime: parseTimestamp(value.commitTime) }),
+    ...(value.commitTime === undefined ? {} : { commitTime: timestampText(value.commitTime) }),
     ...(writeResult.updateTime === undefined
       ? {}
-      : { updateTime: parseTimestamp(writeResult.updateTime) }),
+      : { updateTime: timestampText(writeResult.updateTime) }),
     transformResults,
   };
 }
@@ -687,7 +685,10 @@ export async function patchDocument(
   fields: Record<string, FirestoreWritableValue>,
   options: PatchDocumentOptions = {},
 ): Promise<FirestoreDocument | FirestoreCommitResult> {
-  if (!isRecord(fields) || Object.keys(fields).length === 0) {
+  if (!isRecord(fields)) {
+    throw new TypeError("Invalid Firestore patch");
+  }
+  if (Object.keys(fields).length === 0 && options.updateMask === undefined) {
     throw new TypeError("Invalid Firestore patch");
   }
   if (options.updateMask !== undefined && options.updateMask.length === 0) {
