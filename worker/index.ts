@@ -1,10 +1,18 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import { handlePushEventRequest, type PushQueue } from "./push/handler.ts";
+import type { PushRateLimiter } from "./push/rate-limit.ts";
 
-interface Env {
+export interface Env {
   ASSETS: Fetcher;
   COUNT: D1Database;
+  FIREBASE_PROJECT_ID: string;
+  FIREBASE_CLIENT_EMAIL: string;
+  FIREBASE_PRIVATE_KEY: string;
+  PUSH_FANOUT_QUEUE: PushQueue;
+  PUSH_DELIVERY_QUEUE: PushQueue;
+  PUSH_EVENTS_RATE_LIMITER: PushRateLimiter;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -119,6 +127,10 @@ export async function handleRequestWithCommunityCatalogCache(
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api/push/events") {
+      return handlePushEventRequest(request, env, ctx);
+    }
 
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
