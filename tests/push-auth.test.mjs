@@ -105,13 +105,16 @@ class MemoryCache {
   }
 }
 
-function certificateFetch(certificates, maxAge = 3600, calls = []) {
+function certificateFetch(certificates, maxAge = 3600, calls = [], additionalHeaders = {}) {
   return async (input) => {
     const request = input instanceof Request ? input : new Request(input);
     calls.push(request.url);
     assert.equal(request.url, CERTIFICATE_URL);
     return Response.json(certificates, {
-      headers: { "Cache-Control": `public, max-age=${maxAge}` },
+      headers: {
+        "Cache-Control": `public, max-age=${maxAge}`,
+        ...additionalHeaders,
+      },
     });
   };
 }
@@ -263,6 +266,66 @@ test("reuses Cache API certificates only for the endpoint max-age", async () => 
   nowMilliseconds += 1_000;
   await authModule.verifyFirebaseIdToken(token, PROJECT_ID, options);
   assert.equal(calls.length, 2);
+});
+
+test("subtracts upstream Age from certificate cache freshness", async () => {
+  let nowMilliseconds = NOW_SECONDS * 1000;
+  const cache = new MemoryCache();
+  const calls = [];
+  const options = verificationOptions(
+    { [signer.kid]: signer.certificatePem },
+    {
+      cache,
+      fetch: certificateFetch(
+        { [signer.kid]: signer.certificatePem },
+        60,
+        calls,
+        { Age: "30" },
+      ),
+      now: () => nowMilliseconds,
+    },
+  );
+  const token = await signer.token();
+
+  await authModule.verifyFirebaseIdToken(token, PROJECT_ID, options);
+  const cached = await cache.match(new Request(CERTIFICATE_URL));
+  assert.equal(cached.headers.get("Cache-Control"), "public, max-age=30");
+  assert.equal(
+    cached.headers.get("X-Gubify-Certificates-Expires-At"),
+    String(nowMilliseconds + 30_000),
+  );
+
+  nowMilliseconds += 29_000;
+  await authModule.verifyFirebaseIdToken(token, PROJECT_ID, options);
+  assert.equal(calls.length, 1);
+
+  nowMilliseconds += 1_000;
+  await authModule.verifyFirebaseIdToken(token, PROJECT_ID, options);
+  assert.equal(calls.length, 2);
+});
+
+test("does not cache an already-stale certificate response", async () => {
+  const cache = new MemoryCache();
+  const calls = [];
+  const options = verificationOptions(
+    { [signer.kid]: signer.certificatePem },
+    {
+      cache,
+      fetch: certificateFetch(
+        { [signer.kid]: signer.certificatePem },
+        60,
+        calls,
+        { Date: new Date((NOW_SECONDS - 61) * 1000).toUTCString() },
+      ),
+    },
+  );
+  const token = await signer.token();
+
+  await authModule.verifyFirebaseIdToken(token, PROJECT_ID, options);
+  await authModule.verifyFirebaseIdToken(token, PROJECT_ID, options);
+
+  assert.equal(calls.length, 2);
+  assert.equal(cache.entries.size, 0);
 });
 
 function handlerEnv(rateLimitResults) {

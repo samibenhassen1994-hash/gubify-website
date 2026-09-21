@@ -79,11 +79,11 @@ export function parsePushEventRequest(value: unknown): PushEventRequest {
     return invalidRequest();
   }
 
-  const type = value.type as PushEventType;
-  const requiredKeys = REQUIRED_KEYS[type];
-  if (!requiredKeys) {
+  if (!Object.prototype.hasOwnProperty.call(REQUIRED_KEYS, value.type)) {
     return invalidRequest();
   }
+  const type = value.type as PushEventType;
+  const requiredKeys = REQUIRED_KEYS[type];
 
   const actualKeys = Object.keys(value).sort();
   const expectedKeys = [...requiredKeys].sort();
@@ -116,10 +116,39 @@ export async function readPushEventRequest(request: Request): Promise<PushEventR
     }
   }
 
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > MAX_PUSH_EVENT_BODY_BYTES) {
-    throw new PushRequestError("Push event request is too large", 413);
+  const reader = request.body?.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  if (reader) {
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        totalBytes += value.byteLength;
+        if (totalBytes > MAX_PUSH_EVENT_BODY_BYTES) {
+          try {
+            await reader.cancel();
+          } catch {
+            // The size rejection remains authoritative if cancellation itself fails.
+          }
+          throw new PushRequestError("Push event request is too large", 413);
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
   }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const text = new TextDecoder().decode(bytes);
 
   let value: unknown;
   try {

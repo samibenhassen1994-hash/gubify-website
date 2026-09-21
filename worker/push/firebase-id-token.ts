@@ -81,6 +81,29 @@ function parseMaxAge(cacheControl: string | null): number {
   return Number.isSafeInteger(maxAge) && maxAge > 0 ? maxAge : 0;
 }
 
+function parseAge(ageHeader: string | null): number {
+  if (!ageHeader || !/^\d+$/.test(ageHeader.trim())) {
+    return 0;
+  }
+  const age = Number(ageHeader);
+  return Number.isSafeInteger(age) && age >= 0 ? age : 0;
+}
+
+function remainingFreshnessSeconds(headers: Headers, nowMilliseconds: number): number {
+  const maxAge = parseMaxAge(headers.get("Cache-Control"));
+  if (maxAge === 0) {
+    return 0;
+  }
+
+  const ageSeconds = parseAge(headers.get("Age"));
+  const dateMilliseconds = Date.parse(headers.get("Date") ?? "");
+  const apparentAgeSeconds = Number.isFinite(dateMilliseconds)
+    ? Math.max(0, (nowMilliseconds - dateMilliseconds) / 1000)
+    : 0;
+  const currentAgeSeconds = Math.max(ageSeconds, apparentAgeSeconds);
+  return Math.max(0, Math.floor(maxAge - currentAgeSeconds));
+}
+
 function isCertificateMap(value: unknown): value is Record<string, string> {
   return (
     typeof value === "object" &&
@@ -129,12 +152,13 @@ async function fetchCertificates(
     return invalidToken();
   }
 
-  const maxAgeSeconds = parseMaxAge(response.headers.get("Cache-Control"));
-  if (options.cache && maxAgeSeconds > 0) {
+  const nowMilliseconds = options.now();
+  const cacheSeconds = remainingFreshnessSeconds(response.headers, nowMilliseconds);
+  if (options.cache && cacheSeconds > 0) {
     const headers = new Headers({
-      "Cache-Control": `public, max-age=${maxAgeSeconds}`,
+      "Cache-Control": `public, max-age=${cacheSeconds}`,
       "Content-Type": "application/json",
-      [CACHE_EXPIRY_HEADER]: String(options.now() + maxAgeSeconds * 1000),
+      [CACHE_EXPIRY_HEADER]: String(nowMilliseconds + cacheSeconds * 1000),
     });
     await options.cache.put(cacheKey, Response.json(certificates, { headers }));
   }

@@ -86,6 +86,15 @@ test("rejects unknown event types and missing or empty identifiers", () => {
   }
 });
 
+test("rejects prototype-property event type names as schema errors", () => {
+  for (const type of ["constructor", "__proto__"]) {
+    assert.throws(
+      () => contracts.parsePushEventRequest({ type }),
+      /invalid push event request/i,
+    );
+  }
+});
+
 test("rejects client-controlled recipients and notification copy plus every unknown key", () => {
   for (const extra of [
     { recipientIds: ["user-1"] },
@@ -133,6 +142,46 @@ test("rejects malformed and oversized JSON bodies", async () => {
     }),
   ).catch((error) => error);
   assert.equal(oversized.status, 413);
+});
+
+test("cancels an oversized streamed body as soon as the byte limit is exceeded", async () => {
+  let cancelled = false;
+  let pulls = 0;
+  const chunks = [
+    new Uint8Array(3000),
+    new Uint8Array(2000),
+    new Uint8Array(1000),
+  ];
+  const body = new ReadableStream(
+    {
+      pull(controller) {
+        pulls += 1;
+        const chunk = chunks.shift();
+        if (chunk) {
+          controller.enqueue(chunk);
+        } else {
+          controller.close();
+        }
+      },
+      cancel() {
+        cancelled = true;
+      },
+    },
+    { highWaterMark: 0 },
+  );
+
+  const responseError = await contracts.readPushEventRequest(
+    new Request("https://gubify.com/api/push/events", {
+      method: "POST",
+      body,
+      duplex: "half",
+    }),
+  ).catch((error) => error);
+
+  assert.equal(responseError.status, 413);
+  assert.equal(cancelled, true);
+  assert.equal(pulls, 2);
+  assert.equal(chunks.length, 1);
 });
 
 test("wires only the exact push events path and preserves vinext fallback routing", async () => {
