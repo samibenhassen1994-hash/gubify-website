@@ -193,3 +193,80 @@ test("service account rejects malformed successful token responses without cachi
     assert.deepEqual(cache, {});
   }
 });
+
+test("service account rejects invalid bearer syntax and unbounded token lifetimes", async () => {
+  assert.equal(typeof authModule.getGoogleAccessToken, "function");
+  const invalidResponses = [
+    { access_token: "token with spaces", expires_in: 3600 },
+    { access_token: "token\nwith-newline", expires_in: 3600 },
+    { access_token: 123, expires_in: 3600 },
+    { access_token: "token", expires_in: 1.5 },
+    { access_token: "token", expires_in: 86_401 },
+    { access_token: "a".repeat(8_193), expires_in: 3600 },
+  ];
+
+  for (const responseBody of invalidResponses) {
+    const cache = {};
+    await assert.rejects(
+      authModule.getGoogleAccessToken(
+        { FIREBASE_CLIENT_EMAIL: CLIENT_EMAIL, FIREBASE_PRIVATE_KEY: PRIVATE_KEY },
+        cache,
+        () => NOW_MILLISECONDS,
+        authDependencies(async () => Response.json(responseBody)),
+      ),
+      /Unable to obtain Google access token/,
+    );
+    assert.deepEqual(cache, {});
+  }
+
+  await assert.rejects(
+    authModule.getGoogleAccessToken(
+      { FIREBASE_CLIENT_EMAIL: CLIENT_EMAIL, FIREBASE_PRIVATE_KEY: PRIVATE_KEY },
+      {},
+      () => Number.MAX_SAFE_INTEGER - 1000,
+      authDependencies(async () => Response.json({ access_token: "token", expires_in: 3600 })),
+    ),
+    /Unable to obtain Google access token/,
+  );
+});
+
+test("service account single-flights concurrent cache misses", async () => {
+  assert.equal(typeof authModule.getGoogleAccessToken, "function");
+  let fetchCalls = 0;
+  let releaseResponse;
+  const responseGate = new Promise((resolve) => {
+    releaseResponse = resolve;
+  });
+  const dependencies = authDependencies(async () => {
+    fetchCalls += 1;
+    await responseGate;
+    return Response.json({ access_token: "shared-access-token", expires_in: 3600 });
+  });
+  const cache = {};
+  const env = {
+    FIREBASE_CLIENT_EMAIL: CLIENT_EMAIL,
+    FIREBASE_PRIVATE_KEY: PRIVATE_KEY,
+  };
+
+  const first = authModule.getGoogleAccessToken(
+    env,
+    cache,
+    () => NOW_MILLISECONDS,
+    dependencies,
+  );
+  const second = authModule.getGoogleAccessToken(
+    env,
+    cache,
+    () => NOW_MILLISECONDS,
+    dependencies,
+  );
+  await Promise.resolve();
+  releaseResponse();
+
+  assert.deepEqual(await Promise.all([first, second]), [
+    "shared-access-token",
+    "shared-access-token",
+  ]);
+  assert.equal(fetchCalls, 1);
+  assert.equal(cache.accessToken, "shared-access-token");
+});

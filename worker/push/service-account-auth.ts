@@ -6,6 +6,9 @@ export const GOOGLE_SERVICE_ACCOUNT_SCOPES = [
 
 const ASSERTION_LIFETIME_SECONDS = 3600;
 const ACCESS_TOKEN_EXPIRY_SAFETY_MILLISECONDS = 60_000;
+const MAX_ACCESS_TOKEN_LIFETIME_SECONDS = 86_400;
+const MAX_ACCESS_TOKEN_LENGTH = 8192;
+const BEARER_TOKEN_PATTERN = /^[A-Za-z0-9\-._~+/]+=*$/;
 
 export interface ServiceAccountEnv {
   FIREBASE_CLIENT_EMAIL: string;
@@ -15,6 +18,7 @@ export interface ServiceAccountEnv {
 export interface GoogleAccessTokenCache {
   accessToken?: string;
   expiresAtMilliseconds?: number;
+  refreshPromise?: Promise<string>;
 }
 
 export interface ServiceAccountAuthDependencies {
@@ -114,12 +118,70 @@ function isTokenResponse(
   }
   const response = value as Record<string, unknown>;
   return (
-    typeof response.access_token === "string" &&
-    response.access_token.length > 0 &&
+    isBearerToken(response.access_token) &&
     typeof response.expires_in === "number" &&
-    Number.isFinite(response.expires_in) &&
-    response.expires_in > 0
+    Number.isSafeInteger(response.expires_in) &&
+    response.expires_in > 0 &&
+    response.expires_in <= MAX_ACCESS_TOKEN_LIFETIME_SECONDS
   );
+}
+
+function isBearerToken(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= MAX_ACCESS_TOKEN_LENGTH &&
+    BEARER_TOKEN_PATTERN.test(value)
+  );
+}
+
+async function refreshGoogleAccessToken(
+  env: ServiceAccountEnv,
+  cache: GoogleAccessTokenCache,
+  now: () => number,
+  dependencies: ServiceAccountAuthDependencies,
+  assertionTimeMilliseconds: number,
+): Promise<string> {
+  const fetchImplementation = dependencies.fetch ?? globalThis.fetch;
+  const cryptoImplementation = dependencies.crypto ?? globalThis.crypto;
+  if (typeof fetchImplementation !== "function" || !cryptoImplementation?.subtle) {
+    return tokenError();
+  }
+
+  const assertion = await createAssertion(env, assertionTimeMilliseconds, cryptoImplementation);
+  const body = new URLSearchParams({
+    grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+    assertion,
+  });
+  const response = await fetchImplementation(GOOGLE_OAUTH_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  if (!response.ok) {
+    return tokenError();
+  }
+
+  const responseBody: unknown = await response.json();
+  if (!isTokenResponse(responseBody)) {
+    return tokenError();
+  }
+
+  const responseTimeMilliseconds = now();
+  const expiresAtMilliseconds =
+    responseTimeMilliseconds +
+    Math.max(0, responseBody.expires_in * 1000 - ACCESS_TOKEN_EXPIRY_SAFETY_MILLISECONDS);
+  if (
+    !Number.isSafeInteger(responseTimeMilliseconds) ||
+    responseTimeMilliseconds < 0 ||
+    !Number.isSafeInteger(expiresAtMilliseconds)
+  ) {
+    return tokenError();
+  }
+
+  cache.accessToken = responseBody.access_token;
+  cache.expiresAtMilliseconds = expiresAtMilliseconds;
+  return responseBody.access_token;
 }
 
 export async function getGoogleAccessToken(
@@ -128,49 +190,38 @@ export async function getGoogleAccessToken(
   now: () => number = Date.now,
   dependencies: ServiceAccountAuthDependencies = {},
 ): Promise<string> {
-  const nowMilliseconds = now();
-  if (
-    typeof cache?.accessToken === "string" &&
-    typeof cache.expiresAtMilliseconds === "number" &&
-    cache.expiresAtMilliseconds > nowMilliseconds
-  ) {
-    return cache.accessToken;
-  }
-
   try {
-    if (!Number.isFinite(nowMilliseconds) || !cache) {
+    const nowMilliseconds = now();
+    if (!Number.isSafeInteger(nowMilliseconds) || nowMilliseconds < 0 || !cache) {
       return tokenError();
     }
-    const fetchImplementation = dependencies.fetch ?? globalThis.fetch;
-    const cryptoImplementation = dependencies.crypto ?? globalThis.crypto;
-    if (typeof fetchImplementation !== "function" || !cryptoImplementation?.subtle) {
-      return tokenError();
+    if (
+      isBearerToken(cache.accessToken) &&
+      typeof cache.expiresAtMilliseconds === "number" &&
+      Number.isSafeInteger(cache.expiresAtMilliseconds) &&
+      cache.expiresAtMilliseconds > nowMilliseconds
+    ) {
+      return cache.accessToken;
     }
-
-    const assertion = await createAssertion(env, nowMilliseconds, cryptoImplementation);
-    const body = new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion,
-    });
-    const response = await fetchImplementation(GOOGLE_OAUTH_TOKEN_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-    });
-    if (!response.ok) {
-      return tokenError();
+    if (cache.refreshPromise) {
+      return await cache.refreshPromise;
     }
 
-    const responseBody: unknown = await response.json();
-    if (!isTokenResponse(responseBody)) {
-      return tokenError();
+    const refreshPromise = refreshGoogleAccessToken(
+      env,
+      cache,
+      now,
+      dependencies,
+      nowMilliseconds,
+    );
+    cache.refreshPromise = refreshPromise;
+    try {
+      return await refreshPromise;
+    } finally {
+      if (cache.refreshPromise === refreshPromise) {
+        delete cache.refreshPromise;
+      }
     }
-
-    cache.accessToken = responseBody.access_token;
-    cache.expiresAtMilliseconds =
-      nowMilliseconds +
-      Math.max(0, responseBody.expires_in * 1000 - ACCESS_TOKEN_EXPIRY_SAFETY_MILLISECONDS);
-    return responseBody.access_token;
   } catch {
     return tokenError();
   }

@@ -9,12 +9,12 @@ const ROOT_PATH =
   "https://firestore.googleapis.com/v1/projects/gubify-test/databases/(default)/documents";
 const ROOT_NAME = "projects/gubify-test/databases/(default)/documents";
 
-function rawDocument(name, fields = {}) {
+function rawDocument(name, fields = {}, updateTime = "2026-09-20T10:01:00.000Z") {
   return {
     name,
     fields,
     createTime: "2026-09-20T10:00:00.000Z",
-    updateTime: "2026-09-20T10:01:00.000Z",
+    updateTime,
   };
 }
 
@@ -308,4 +308,217 @@ test("Firestore REST treats only get/delete 404 as missing and rejects malformed
       return true;
     },
   );
+});
+
+test("Firestore REST keeps special-character document IDs unencoded inside commit resource names", async () => {
+  let commitBody;
+  const firestore = client(async (_input, init) => {
+    commitBody = JSON.parse(init.body);
+    return Response.json({
+      writeResults: [{ updateTime: "2026-09-20T10:01:00.000Z" }],
+      commitTime: "2026-09-20T10:01:00.000Z",
+    });
+  });
+
+  await firestoreModule.createDocument(
+    firestore,
+    "pushDeliveryEvents",
+    "event +#1",
+    { createdAt: firestoreModule.SERVER_TIMESTAMP },
+  );
+
+  assert.equal(
+    commitBody.writes[0].update.name,
+    `${ROOT_NAME}/pushDeliveryEvents/event +#1`,
+  );
+});
+
+test("Firestore REST rejects dot traversal segments across every path-bearing helper", async () => {
+  let fetchCalls = 0;
+  const firestore = client(async () => {
+    fetchCalls += 1;
+    throw new Error("fetch must not run for an invalid path");
+  });
+  const invalidCalls = [
+    () => firestoreModule.getDocument(firestore, "users/../devices/device-1"),
+    () => firestoreModule.listDocuments(firestore, "users/./devices"),
+    () => firestoreModule.runQuery(firestore, "users/..", {}),
+    () => firestoreModule.createDocument(firestore, "users/./devices", "device-1", {}),
+    () => firestoreModule.createDocument(firestore, "users/user-1/devices", "..", {}),
+    () => firestoreModule.patchDocument(firestore, "users/../devices/device-1", { ok: true }),
+    () => firestoreModule.deleteDocument(firestore, "users/../devices/device-1"),
+  ];
+
+  for (const invalidCall of invalidCalls) {
+    await assert.rejects(invalidCall, /Invalid Firestore (path|document ID)/);
+  }
+  assert.equal(fetchCalls, 0);
+});
+
+test("Firestore REST quotes generated literal field paths and preserves explicit field paths", async () => {
+  const calls = [];
+  const firestore = client(async (input, init) => {
+    calls.push({ url: new URL(input), init });
+    if (init.method === "PATCH") {
+      return Response.json(rawDocument("patched", { ok: { booleanValue: true } }));
+    }
+    return Response.json({
+      writeResults: [{ updateTime: "2026-09-20T10:01:00.000Z" }],
+      commitTime: "2026-09-20T10:01:00.000Z",
+    });
+  });
+
+  await firestoreModule.patchDocument(
+    firestore,
+    "users/user-1",
+    { "a.b": "literal", "9lives": 9, "bak`tik": true },
+  );
+  await firestoreModule.patchDocument(
+    firestore,
+    "users/user-1",
+    { "a.b": "literal" },
+    { updateMask: ["nested.value"] },
+  );
+  await firestoreModule.patchDocument(
+    firestore,
+    "users/user-1",
+    { "bak`tik": firestoreModule.SERVER_TIMESTAMP },
+  );
+
+  assert.deepEqual(calls[0].url.searchParams.getAll("updateMask.fieldPaths"), [
+    "`a.b`",
+    "`9lives`",
+    "`bak\\`tik`",
+  ]);
+  assert.deepEqual(calls[1].url.searchParams.getAll("updateMask.fieldPaths"), [
+    "nested.value",
+  ]);
+  assert.deepEqual(
+    JSON.parse(calls[2].init.body).writes[0].transform.fieldTransforms,
+    [{ fieldPath: "`bak\\`tik`", setToServerValue: "REQUEST_TIME" }],
+  );
+});
+
+test("Firestore REST rejects an empty patch instead of replacing the whole document", async () => {
+  let fetchCalls = 0;
+  const firestore = client(async () => {
+    fetchCalls += 1;
+    return Response.json(rawDocument("unexpected"));
+  });
+
+  await assert.rejects(
+    firestoreModule.patchDocument(firestore, "users/user-1", {}),
+    /Invalid Firestore patch/,
+  );
+  assert.equal(fetchCalls, 0);
+});
+
+test("Firestore REST rejects an explicitly empty update mask", async () => {
+  let fetchCalls = 0;
+  const firestore = client(async () => {
+    fetchCalls += 1;
+    return Response.json(rawDocument("unexpected"));
+  });
+
+  await assert.rejects(
+    firestoreModule.patchDocument(
+      firestore,
+      "users/user-1",
+      { displayName: "Name" },
+      { updateMask: [] },
+    ),
+    /Invalid Firestore patch/,
+  );
+  assert.equal(fetchCalls, 0);
+});
+
+test("Firestore REST keeps explicit deletions when a patch otherwise contains only transforms", async () => {
+  let commitBody;
+  const firestore = client(async (_input, init) => {
+    commitBody = JSON.parse(init.body);
+    return Response.json({
+      writeResults: [{ updateTime: "2026-09-20T10:01:00.000Z" }],
+      commitTime: "2026-09-20T10:01:00.000Z",
+    });
+  });
+
+  await firestoreModule.patchDocument(
+    firestore,
+    "users/user-1",
+    { updatedAt: firestoreModule.SERVER_TIMESTAMP },
+    { updateMask: ["obsolete"], precondition: { exists: true } },
+  );
+
+  assert.deepEqual(commitBody.writes[0], {
+    update: { name: `${ROOT_NAME}/users/user-1`, fields: {} },
+    updateMask: { fieldPaths: ["obsolete"] },
+    updateTransforms: [{ fieldPath: "updatedAt", setToServerValue: "REQUEST_TIME" }],
+    currentDocument: { exists: true },
+  });
+});
+
+test("Firestore REST preserves exact updateTime precision through a conditional-write round trip", async () => {
+  const preciseUpdateTime = "2026-09-20T10:01:00.123456000Z";
+  const calls = [];
+  const firestore = client(async (input, init) => {
+    calls.push({ url: new URL(input), init });
+    return Response.json(rawDocument("users/user-1", {}, preciseUpdateTime));
+  });
+
+  const document = await firestoreModule.getDocument(firestore, "users/user-1");
+  assert.equal(document.updateTime.toISOString(), preciseUpdateTime);
+  await firestoreModule.patchDocument(
+    firestore,
+    "users/user-1",
+    { enabled: true },
+    { precondition: { updateTime: document.updateTime } },
+  );
+
+  assert.equal(
+    calls[1].url.searchParams.get("currentDocument.updateTime"),
+    preciseUpdateTime,
+  );
+});
+
+test("Firestore REST preserves reference and geo point types across decode and encode", async () => {
+  assert.equal(typeof firestoreModule.FirestoreReference, "function");
+  assert.equal(typeof firestoreModule.FirestoreGeoPoint, "function");
+  const referenceName = `${ROOT_NAME}/users/user-2`;
+  const calls = [];
+  const firestore = client(async (input, init) => {
+    calls.push({ url: new URL(input), init });
+    if (init.method === "PATCH") {
+      return Response.json(rawDocument("users/user-1"));
+    }
+    return Response.json(rawDocument("users/user-1", {
+      text: { stringValue: referenceName },
+      reference: { referenceValue: referenceName },
+      coordinates: { mapValue: { fields: {
+        latitude: { doubleValue: 45.46 },
+        longitude: { doubleValue: 9.19 },
+      } } },
+      location: { geoPointValue: { latitude: 45.46, longitude: 9.19 } },
+    }));
+  });
+
+  const document = await firestoreModule.getDocument(firestore, "users/user-1");
+  assert.equal(document.fields.text, referenceName);
+  assert.ok(document.fields.reference instanceof firestoreModule.FirestoreReference);
+  assert.equal(document.fields.reference.name, referenceName);
+  assert.deepEqual(document.fields.coordinates, { latitude: 45.46, longitude: 9.19 });
+  assert.ok(document.fields.location instanceof firestoreModule.FirestoreGeoPoint);
+  assert.equal(document.fields.location.latitude, 45.46);
+  assert.equal(document.fields.location.longitude, 9.19);
+
+  await firestoreModule.patchDocument(
+    firestore,
+    "users/user-1",
+    { reference: document.fields.reference, location: document.fields.location },
+  );
+  assert.deepEqual(JSON.parse(calls[1].init.body), {
+    fields: {
+      reference: { referenceValue: referenceName },
+      location: { geoPointValue: { latitude: 45.46, longitude: 9.19 } },
+    },
+  });
 });

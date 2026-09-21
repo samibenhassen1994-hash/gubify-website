@@ -4,6 +4,37 @@ const TIMESTAMP_PATTERN =
 
 export const SERVER_TIMESTAMP: unique symbol = Symbol("Firestore server timestamp");
 
+export class FirestoreReference {
+  readonly name: string;
+
+  constructor(name: string) {
+    if (typeof name !== "string" || name.length === 0) {
+      throw new TypeError("Invalid Firestore reference");
+    }
+    this.name = name;
+  }
+}
+
+export class FirestoreGeoPoint {
+  readonly latitude: number;
+  readonly longitude: number;
+
+  constructor(latitude: number, longitude: number) {
+    if (
+      !Number.isFinite(latitude) ||
+      latitude < -90 ||
+      latitude > 90 ||
+      !Number.isFinite(longitude) ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      throw new TypeError("Invalid Firestore geo point");
+    }
+    this.latitude = latitude;
+    this.longitude = longitude;
+  }
+}
+
 export type FirestoreValue =
   | null
   | boolean
@@ -11,6 +42,8 @@ export type FirestoreValue =
   | string
   | Date
   | Uint8Array
+  | FirestoreReference
+  | FirestoreGeoPoint
   | FirestoreValue[]
   | { [field: string]: FirestoreValue };
 
@@ -96,6 +129,12 @@ function parseTimestamp(value: unknown): Date {
   if (!Number.isFinite(timestamp.getTime())) {
     return malformed();
   }
+  Object.defineProperty(timestamp, "toISOString", {
+    configurable: false,
+    enumerable: false,
+    value: () => value,
+    writable: false,
+  });
   return timestamp;
 }
 
@@ -139,7 +178,7 @@ function decodeDouble(value: unknown): number {
 }
 
 function decodeMap(value: unknown): Record<string, FirestoreValue> {
-  if (!isRecord(value)) {
+  if (!isRecord(value) || Object.keys(value).some((key) => key !== "fields")) {
     return malformed();
   }
   if (value.fields === undefined) {
@@ -152,7 +191,7 @@ function decodeMap(value: unknown): Record<string, FirestoreValue> {
 }
 
 function decodeArray(value: unknown): FirestoreValue[] {
-  if (!isRecord(value)) {
+  if (!isRecord(value) || Object.keys(value).some((key) => key !== "values")) {
     return malformed();
   }
   if (value.values === undefined) {
@@ -164,9 +203,10 @@ function decodeArray(value: unknown): FirestoreValue[] {
   return value.values.map(decodeValue);
 }
 
-function decodeGeoPoint(value: unknown): { latitude: number; longitude: number } {
+function decodeGeoPoint(value: unknown): FirestoreGeoPoint {
   if (
     !isRecord(value) ||
+    Object.keys(value).length !== 2 ||
     typeof value.latitude !== "number" ||
     !Number.isFinite(value.latitude) ||
     typeof value.longitude !== "number" ||
@@ -174,7 +214,11 @@ function decodeGeoPoint(value: unknown): { latitude: number; longitude: number }
   ) {
     return malformed();
   }
-  return { latitude: value.latitude, longitude: value.longitude };
+  try {
+    return new FirestoreGeoPoint(value.latitude, value.longitude);
+  } catch {
+    return malformed();
+  }
 }
 
 export function decodeValue(value: unknown): FirestoreValue {
@@ -203,7 +247,11 @@ export function decodeValue(value: unknown): FirestoreValue {
     return decodeBytes(value.bytesValue);
   }
   if ("referenceValue" in value && typeof value.referenceValue === "string") {
-    return value.referenceValue;
+    try {
+      return new FirestoreReference(value.referenceValue);
+    } catch {
+      return malformed();
+    }
   }
   if ("geoPointValue" in value) {
     return decodeGeoPoint(value.geoPointValue);
@@ -279,6 +327,14 @@ function encodeValue(value: FirestoreWritableValue): Record<string, unknown> {
   if (value instanceof Uint8Array) {
     return { bytesValue: encodeBytes(value) };
   }
+  if (value instanceof FirestoreReference) {
+    return { referenceValue: value.name };
+  }
+  if (value instanceof FirestoreGeoPoint) {
+    return {
+      geoPointValue: { latitude: value.latitude, longitude: value.longitude },
+    };
+  }
   if (Array.isArray(value)) {
     return { arrayValue: { values: value.map(encodeValue) } };
   }
@@ -304,7 +360,7 @@ function splitTransforms(fields: Record<string, FirestoreWritableValue>): {
   const transforms: { fieldPath: string; setToServerValue: "REQUEST_TIME" }[] = [];
   for (const [field, value] of Object.entries(fields)) {
     if (value === SERVER_TIMESTAMP) {
-      transforms.push({ fieldPath: field, setToServerValue: "REQUEST_TIME" });
+      transforms.push({ fieldPath: literalFieldPath(field), setToServerValue: "REQUEST_TIME" });
     } else {
       regularFields[field] = value;
     }
@@ -312,19 +368,40 @@ function splitTransforms(fields: Record<string, FirestoreWritableValue>): {
   return { encodedFields: encodeFields(regularFields), transforms };
 }
 
-function encodedPath(path: string, expected: "document" | "collection" | "parent"): string {
+function pathSegments(
+  path: string,
+  expected: "document" | "collection" | "parent",
+): string[] {
   if (path === "" && expected === "parent") {
-    return "";
+    return [];
   }
   const segments = path.split("/");
-  if (segments.some((segment) => segment.length === 0)) {
+  if (segments.some((segment) => segment.length === 0 || segment === "." || segment === "..")) {
     throw new TypeError("Invalid Firestore path");
   }
   const shouldBeEven = expected === "document" || expected === "parent";
   if ((segments.length % 2 === 0) !== shouldBeEven) {
     throw new TypeError("Invalid Firestore path");
   }
-  return segments.map(encodeURIComponent).join("/");
+  return segments;
+}
+
+function encodedPath(path: string, expected: "document" | "collection" | "parent"): string {
+  return pathSegments(path, expected).map(encodeURIComponent).join("/");
+}
+
+function resourcePath(path: string, expected: "document" | "collection" | "parent"): string {
+  return pathSegments(path, expected).join("/");
+}
+
+function literalFieldPath(field: string): string {
+  if (typeof field !== "string" || field.length === 0) {
+    throw new TypeError("Invalid Firestore field name");
+  }
+  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(field)) {
+    return field;
+  }
+  return `\`${field.replaceAll("\\", "\\\\").replaceAll("`", "\\`")}\``;
 }
 
 function rootUrl(client: FirestoreRestClient): string {
@@ -440,13 +517,13 @@ async function commitWrite(
 ): Promise<FirestoreCommitResult> {
   const { encodedFields, transforms } = splitTransforms(fields);
   const url = new URL(`${rootUrl(client)}:commit`);
-  const name = `${rootName(client)}/${encodedPath(documentPath, "document")}`;
+  const name = `${rootName(client)}/${resourcePath(documentPath, "document")}`;
   const regularFieldNames = Object.keys(encodedFields);
   const precondition = preconditionJson(
     options.precondition,
     mode === "create" ? { exists: false } : undefined,
   );
-  const write = mode === "patch" && regularFieldNames.length === 0
+  const write = mode === "patch" && regularFieldNames.length === 0 && options.updateMask === undefined
     ? {
         transform: { document: name, fieldTransforms: transforms },
         ...(precondition ? { currentDocument: precondition } : {}),
@@ -454,7 +531,13 @@ async function commitWrite(
     : {
         update: { name, fields: encodedFields },
         ...(mode === "patch"
-          ? { updateMask: { fieldPaths: [...(options.updateMask ?? regularFieldNames)] } }
+          ? {
+              updateMask: {
+                fieldPaths: [
+                  ...(options.updateMask ?? regularFieldNames.map(literalFieldPath)),
+                ],
+              },
+            }
           : {}),
         updateTransforms: transforms,
         ...(precondition ? { currentDocument: precondition } : {}),
@@ -576,6 +659,10 @@ export async function createDocument(
   if (typeof documentId !== "string" || documentId.length === 0 || documentId.includes("/")) {
     throw new TypeError("Invalid Firestore document ID");
   }
+  if (documentId === "." || documentId === "..") {
+    throw new TypeError("Invalid Firestore document ID");
+  }
+  pathSegments(collectionPath, "collection");
   if (Object.values(fields).includes(SERVER_TIMESTAMP)) {
     if (options.mask?.length) {
       throw new TypeError("Response masks are unavailable for transformed writes");
@@ -600,6 +687,12 @@ export async function patchDocument(
   fields: Record<string, FirestoreWritableValue>,
   options: PatchDocumentOptions = {},
 ): Promise<FirestoreDocument | FirestoreCommitResult> {
+  if (!isRecord(fields) || Object.keys(fields).length === 0) {
+    throw new TypeError("Invalid Firestore patch");
+  }
+  if (options.updateMask !== undefined && options.updateMask.length === 0) {
+    throw new TypeError("Invalid Firestore patch");
+  }
   if (Object.values(fields).includes(SERVER_TIMESTAMP)) {
     if (options.mask?.length) {
       throw new TypeError("Response masks are unavailable for transformed writes");
@@ -607,7 +700,11 @@ export async function patchDocument(
     return commitWrite(client, documentPath, fields, "patch", options);
   }
   const url = new URL(`${rootUrl(client)}/${encodedPath(documentPath, "document")}`);
-  appendMask(url, "updateMask", options.updateMask ?? Object.keys(fields));
+  appendMask(
+    url,
+    "updateMask",
+    options.updateMask ?? Object.keys(fields).map(literalFieldPath),
+  );
   appendMask(url, "mask", options.mask);
   appendPrecondition(url, options.precondition);
   const response = await performFetch(client, url, {
