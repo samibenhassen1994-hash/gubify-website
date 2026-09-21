@@ -476,7 +476,7 @@ test("verified-UID limiting happens immediately after authentication and before 
   assert.deepEqual(queueMessages, []);
 });
 
-test("the authenticated shell stays fail-closed until authoritative event persistence exists", async () => {
+test("the authenticated handler stays fail-closed when service credentials are unavailable", async () => {
   const handle = handlerModule.createPushEventRequestHandler({
     async verifyFirebaseIdToken() {
       return { uid: "firebase-user-1", claims: {} };
@@ -485,6 +485,6 @@ test("the authenticated shell stays fail-closed until authoritative event persis
   const { env, queueMessages } = handlerEnv([true, true]);
   const response = await handle(validHandlerRequest(), env, {});
 
-  assert.equal(response.status, 501);
+  assert.equal(response.status, 503);
   assert.deepEqual(queueMessages, []);
 });

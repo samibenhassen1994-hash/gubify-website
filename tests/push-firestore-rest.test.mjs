@@ -3,6 +3,19 @@ import test from "node:test";
 
 const firestoreModule = await import("../worker/push/firestore-rest.ts").catch(() => ({}));
 
+test("Firestore REST exact timestamp accessor preserves nanoseconds without changing Date semantics", () => {
+  assert.equal(typeof firestoreModule.exactTimestamp, "function");
+  const first = firestoreModule.decodeValue({ timestampValue: "2026-09-21T10:00:00.123456Z" });
+  const next = firestoreModule.decodeValue({ timestampValue: "2026-09-21T12:00:00.123457+02:00" });
+  assert.deepEqual(first, new Date("2026-09-21T10:00:00.123Z"));
+  assert.equal(first.getTime(), next.getTime());
+  assert.equal(firestoreModule.exactTimestamp(first), "2026-09-21T10:00:00.123456000Z");
+  assert.equal(firestoreModule.exactTimestamp(next), "2026-09-21T10:00:00.123457000Z");
+  assert.equal(firestoreModule.exactTimestamp("2026-09-21T10:00:00Z"), undefined);
+  first.setTime(0);
+  assert.equal(firestoreModule.exactTimestamp(first), undefined, "mutated dates cannot reuse stale precision metadata");
+});
+
 const PROJECT_ID = "gubify-test";
 const ACCESS_TOKEN = "test-access-token";
 const ROOT_PATH =

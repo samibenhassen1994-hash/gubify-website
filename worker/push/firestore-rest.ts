@@ -1,6 +1,14 @@
 const FIRESTORE_API_ROOT = "https://firestore.googleapis.com/v1";
 const TIMESTAMP_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+// Keep Date's public behavior while retaining precision for timestamp identities.
+const exactTimestamps = new WeakMap<Date, { milliseconds: number; text: string }>();
+
+export function exactTimestamp(value: unknown): string | undefined {
+  if (!(value instanceof Date)) return undefined;
+  const exact = exactTimestamps.get(value);
+  return exact?.milliseconds === value.getTime() ? exact.text : undefined;
+}
 
 export const SERVER_TIMESTAMP: unique symbol = Symbol("Firestore server timestamp");
 
@@ -133,7 +141,14 @@ function timestampText(value: unknown): string {
 }
 
 function parseTimestamp(value: unknown): Date {
-  return new Date(timestampText(value));
+  const text = timestampText(value);
+  const date = new Date(text);
+  const fraction = text.match(/\.(\d{1,9})/)?.[1] ?? "";
+  exactTimestamps.set(date, {
+    milliseconds: date.getTime(),
+    text: `${date.toISOString().slice(0, 19)}.${fraction.padEnd(9, "0")}Z`,
+  });
+  return date;
 }
 
 function decodeBytes(value: unknown): Uint8Array {

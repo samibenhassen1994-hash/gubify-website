@@ -5,6 +5,10 @@ import {
   type VerifiedFirebaseUser,
 } from "./firebase-id-token.ts";
 import { PushRequestError, readPushEventRequest } from "./contracts.ts";
+import { validatePushEvent } from "./event-validator.ts";
+import { createEventPlanStore } from "./event-plan-store.ts";
+import type { FirestoreRestClient } from "./firestore-rest.ts";
+import { getGoogleAccessToken, type GoogleAccessTokenCache } from "./service-account-auth.ts";
 import {
   hashRateLimitIdentity,
   isRateLimitAllowed,
@@ -37,6 +41,7 @@ interface HandlerDependencies {
   firebaseVerification?: FirebaseTokenVerificationOptions;
   crypto?: Crypto;
   onRateLimitKey?: (key: string) => void;
+  createFirestoreClient?: (env: PushEventEnv) => Promise<FirestoreRestClient>;
 }
 
 type PushEventRequestHandler = (
@@ -66,6 +71,11 @@ export function createPushEventRequestHandler(
 ): PushEventRequestHandler {
   const verifyToken = dependencies.verifyFirebaseIdToken ?? verifyFirebaseIdToken;
   const cryptoImplementation = dependencies.crypto ?? globalThis.crypto;
+  const accessTokenCache: GoogleAccessTokenCache = {};
+  const createFirestoreClient = dependencies.createFirestoreClient ?? (async (env: PushEventEnv) => ({
+    projectId: env.FIREBASE_PROJECT_ID,
+    accessToken: await getGoogleAccessToken(env, accessTokenCache),
+  }));
 
   return async (request, env, ctx) => {
     void ctx;
@@ -98,8 +108,13 @@ export function createPushEventRequestHandler(
         return jsonResponse(429, "Too many requests");
       }
 
-      await readPushEventRequest(request);
-      return jsonResponse(501, "Push event processing is not implemented");
+      const eventRequest = await readPushEventRequest(request);
+      const firestore = await createFirestoreClient(env);
+      const validated = await validatePushEvent(eventRequest, user.uid, firestore);
+      await createEventPlanStore(firestore).ensureEventPlan(validated);
+      // Task 7 adds durable FANOUT enqueue/recovery. Persistence alone must not
+      // report success or consume the event; clients can safely retry this plan.
+      return jsonResponse(503, "Push event delivery is unavailable");
     } catch (error) {
       if (error instanceof PushRequestError) {
         return jsonResponse(error.status, error.message);
