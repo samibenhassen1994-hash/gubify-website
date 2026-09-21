@@ -18,8 +18,22 @@ function memoryFirestore() {
       if (init?.method === "POST") {
         assert.ok(url.pathname.endsWith("/documents:commit"));
         const { writes: [write] } = JSON.parse(init.body); writes.push(write);
-        assert.deepEqual(write.currentDocument, { exists: false });
         if (failStatus) return new Response(null, { status: failStatus });
+        if (write.currentDocument?.exists === true) {
+          const saved = docs.get(write.update.name);
+          assert.ok(saved);
+          for (const fieldPath of write.updateMask.fieldPaths) {
+            const [parent, child] = fieldPath.split(".");
+            saved.fields[parent].mapValue.fields[child] =
+              structuredClone(write.update.fields[parent].mapValue.fields[child]);
+          }
+          for (const transform of write.updateTransforms) {
+            assert.equal(transform.setToServerValue, "REQUEST_TIME");
+            saved.fields[transform.fieldPath] = { timestampValue: "2026-09-21T10:00:00.123456Z" };
+          }
+          return Response.json({ writeResults: [{}], commitTime: "2026-09-21T10:00:00Z" });
+        }
+        assert.deepEqual(write.currentDocument, { exists: false });
         if (docs.has(write.update.name)) return new Response(null, { status: 409 });
         assert.ok(write.update.name.startsWith(root + "pushDeliveryEvents/"));
         const saved = structuredClone(write.update);
@@ -85,7 +99,7 @@ test("event plan storage outages do not become successful duplicate submissions"
   memory.failWith(409);
   await assert.rejects(plans.ensureEventPlan(event), /event plan mismatch/i);
 });
-test("event plan HTTP integration persists after authorization without inbox, FCM or premature success", async () => {
+test("event plan HTTP integration persists then enqueues FANOUT without inbox or DELIVERY work", async () => {
   const memory = memoryFirestore();
   const fields = (object) => Object.fromEntries(Object.entries(object).map(([key, value]) => [key, typeof value === "boolean" ? { booleanValue: value } : { stringValue: value }]));
   for (const [path, data] of Object.entries({
@@ -93,7 +107,7 @@ test("event plan HTTP integration persists after authorization without inbox, FC
     "gubs/g/members/actor": { userId: "actor" },
     "gubs/g/tasks/t": { gubId: "g", taskId: "t", creatorId: "actor", assignedUserId: "recipient", status: "active", archived: false },
   })) memory.docs.set(root + path, { name: root + path, fields: fields(data) });
-  let queued = 0;
+  const queued = [];
   const handle = createPushEventRequestHandler({
     async verifyFirebaseIdToken() { return { uid: "actor", claims: {} }; },
     async createFirestoreClient() { return memory.firestore; },
@@ -102,9 +116,10 @@ test("event plan HTTP integration persists after authorization without inbox, FC
     method: "POST", headers: { Authorization: "Bearer test" }, body: JSON.stringify({ type: "task_assigned", gubId: "g", taskId: "t" }),
   }), {
     FIREBASE_PROJECT_ID: "push-test", PUSH_EVENTS_RATE_LIMITER: { async limit() { return { success: true }; } },
-    PUSH_FANOUT_QUEUE: { async send() { queued++; } }, PUSH_DELIVERY_QUEUE: { async send() { queued++; } },
+    PUSH_FANOUT_QUEUE: { async send(message) { queued.push(message); } },
+    PUSH_DELIVERY_QUEUE: { async send() { throw new Error("HTTP must not enqueue DELIVERY"); } },
   }, {});
-  assert.equal(memory.writes.length, 1);
-  assert.equal(queued, 0, "queue protocol belongs to Task 7");
-  assert.equal(response.status, 503, "persisting alone does not consume an event");
+  assert.equal(memory.writes.length, 2);
+  assert.deepEqual(queued, [{ kind: "fanout", eventKey: "task_assigned__g__t" }]);
+  assert.equal(response.status, 202);
 });

@@ -7,7 +7,12 @@ import {
 import { PushRequestError, readPushEventRequest } from "./contracts.ts";
 import { validatePushEvent } from "./event-validator.ts";
 import { createEventPlanStore } from "./event-plan-store.ts";
-import type { FirestoreRestClient } from "./firestore-rest.ts";
+import {
+  patchDocument,
+  SERVER_TIMESTAMP,
+  type FirestoreRestClient,
+} from "./firestore-rest.ts";
+import { fanoutMessage, type DeliveryMessage, type FanoutMessage } from "./queue-messages.ts";
 import { getGoogleAccessToken, type GoogleAccessTokenCache } from "./service-account-auth.ts";
 import {
   hashRateLimitIdentity,
@@ -23,8 +28,8 @@ export interface PushEventEnv {
   FIREBASE_PROJECT_ID: string;
   FIREBASE_CLIENT_EMAIL: string;
   FIREBASE_PRIVATE_KEY: string;
-  PUSH_FANOUT_QUEUE: PushQueue;
-  PUSH_DELIVERY_QUEUE: PushQueue;
+  PUSH_FANOUT_QUEUE: PushQueue<FanoutMessage>;
+  PUSH_DELIVERY_QUEUE: PushQueue<DeliveryMessage>;
   PUSH_EVENTS_RATE_LIMITER: PushRateLimiter;
 }
 
@@ -57,6 +62,13 @@ function jsonResponse(status: number, error: string): Response {
       status,
       headers: { "Cache-Control": "no-store" },
     },
+  );
+}
+
+function acceptedResponse(eventKey: string): Response {
+  return Response.json(
+    { accepted: true, eventKey },
+    { status: 202, headers: { "Cache-Control": "no-store" } },
   );
 }
 
@@ -111,10 +123,29 @@ export function createPushEventRequestHandler(
       const eventRequest = await readPushEventRequest(request);
       const firestore = await createFirestoreClient(env);
       const validated = await validatePushEvent(eventRequest, user.uid, firestore);
-      await createEventPlanStore(firestore).ensureEventPlan(validated);
-      // Task 7 adds durable FANOUT enqueue/recovery. Persistence alone must not
-      // report success or consume the event; clients can safely retry this plan.
-      return jsonResponse(503, "Push event delivery is unavailable");
+      const plan = await createEventPlanStore(firestore).ensureEventPlan(validated);
+      if (plan.fanout.completed) return acceptedResponse(plan.eventKey);
+
+      await env.PUSH_FANOUT_QUEUE.send(fanoutMessage(plan.eventKey, plan.fanout.cursor));
+      // Queue acceptance and Firestore status are not atomic. A failed patch
+      // returns 503 so the same deterministic FANOUT message is sent again.
+      await patchDocument(
+        firestore,
+        `pushDeliveryEvents/${plan.eventKey}`,
+        {
+          fanout: {
+            ...plan.fanout,
+            status: "enqueued",
+            attempts: plan.fanout.attempts + 1,
+          },
+          fanoutEnqueuedAt: SERVER_TIMESTAMP,
+        },
+        {
+          updateMask: ["fanout.status", "fanout.attempts"],
+          precondition: { exists: true },
+        },
+      );
+      return acceptedResponse(plan.eventKey);
     } catch (error) {
       if (error instanceof PushRequestError) {
         return jsonResponse(error.status, error.message);

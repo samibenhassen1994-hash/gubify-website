@@ -1,7 +1,14 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import { handleFanoutMessage } from "./push/fanout-consumer.ts";
 import { handlePushEventRequest, type PushQueue } from "./push/handler.ts";
+import {
+  dispatchPushQueueBatch,
+  type DeliveryMessage,
+  type FanoutMessage,
+  type PushQueueBatch,
+} from "./push/queue-messages.ts";
 import type { PushRateLimiter } from "./push/rate-limit.ts";
 
 export interface Env {
@@ -10,8 +17,8 @@ export interface Env {
   FIREBASE_PROJECT_ID: string;
   FIREBASE_CLIENT_EMAIL: string;
   FIREBASE_PRIVATE_KEY: string;
-  PUSH_FANOUT_QUEUE: PushQueue;
-  PUSH_DELIVERY_QUEUE: PushQueue;
+  PUSH_FANOUT_QUEUE: PushQueue<FanoutMessage>;
+  PUSH_DELIVERY_QUEUE: PushQueue<DeliveryMessage>;
   PUSH_EVENTS_RATE_LIMITER: PushRateLimiter;
   IMAGES: {
     input(stream: ReadableStream): {
@@ -162,6 +169,14 @@ const worker = {
       () => handler.fetch(request, env, ctx),
       (caches as CacheStorage & { default: Cache }).default,
     );
+  },
+
+  async queue(batch: PushQueueBatch, env: Env): Promise<void> {
+    // Cloudflare's subrequest cap applies to the whole Queue invocation, not
+    // independently to every message in a delivered batch. Process at most
+    // one FANOUT message and retry the remainder so the 40-call budget holds
+    // even if an external Queue configuration later uses batches above one.
+    await dispatchPushQueueBatch(batch, (message) => handleFanoutMessage(message, env));
   },
 };
 
