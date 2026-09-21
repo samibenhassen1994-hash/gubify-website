@@ -304,6 +304,86 @@ test("subtracts upstream Age from certificate cache freshness", async () => {
   assert.equal(calls.length, 2);
 });
 
+test("advances upstream Age across certificate fetch and body consumption", async () => {
+  const startedAt = NOW_SECONDS * 1000;
+  let nowMilliseconds = startedAt;
+  const cache = new MemoryCache();
+  const calls = [];
+  const certificates = { [signer.kid]: signer.certificatePem };
+  const options = verificationOptions(certificates, {
+    cache,
+    now: () => nowMilliseconds,
+    fetch: async (input) => {
+      const request = input instanceof Request ? input : new Request(input);
+      calls.push(request.url);
+      assert.equal(request.url, CERTIFICATE_URL);
+      nowMilliseconds += 4_000;
+      return {
+        ok: true,
+        headers: new Headers({
+          Age: "30",
+          "Cache-Control": "public, max-age=60",
+        }),
+        async json() {
+          nowMilliseconds += 6_000;
+          return certificates;
+        },
+      };
+    },
+  });
+  const token = await signer.token();
+
+  await authModule.verifyFirebaseIdToken(token, PROJECT_ID, options);
+  const cached = await cache.match(new Request(CERTIFICATE_URL));
+  assert.equal(cached.headers.get("Cache-Control"), "public, max-age=20");
+  assert.equal(
+    cached.headers.get("X-Gubify-Certificates-Expires-At"),
+    String(startedAt + 30_000),
+  );
+
+  nowMilliseconds += 19_000;
+  await authModule.verifyFirebaseIdToken(token, PROJECT_ID, options);
+  assert.equal(calls.length, 1);
+
+  nowMilliseconds += 1_000;
+  await authModule.verifyFirebaseIdToken(token, PROJECT_ID, options);
+  assert.equal(calls.length, 2);
+});
+
+test("does not cache certificates that become stale while the response is consumed", async () => {
+  let nowMilliseconds = NOW_SECONDS * 1000;
+  const cache = new MemoryCache();
+  const calls = [];
+  const certificates = { [signer.kid]: signer.certificatePem };
+  const options = verificationOptions(certificates, {
+    cache,
+    now: () => nowMilliseconds,
+    fetch: async (input) => {
+      const request = input instanceof Request ? input : new Request(input);
+      calls.push(request.url);
+      assert.equal(request.url, CERTIFICATE_URL);
+      return {
+        ok: true,
+        headers: new Headers({
+          Age: "30",
+          "Cache-Control": "public, max-age=60",
+        }),
+        async json() {
+          nowMilliseconds += 30_000;
+          return certificates;
+        },
+      };
+    },
+  });
+  const token = await signer.token();
+
+  await authModule.verifyFirebaseIdToken(token, PROJECT_ID, options);
+  await authModule.verifyFirebaseIdToken(token, PROJECT_ID, options);
+
+  assert.equal(calls.length, 2);
+  assert.equal(cache.entries.size, 0);
+});
+
 test("does not cache an already-stale certificate response", async () => {
   const cache = new MemoryCache();
   const calls = [];

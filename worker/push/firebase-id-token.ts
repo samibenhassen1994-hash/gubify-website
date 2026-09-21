@@ -89,13 +89,17 @@ function parseAge(ageHeader: string | null): number {
   return Number.isSafeInteger(age) && age >= 0 ? age : 0;
 }
 
-function remainingFreshnessSeconds(headers: Headers, nowMilliseconds: number): number {
+function remainingFreshnessSeconds(
+  headers: Headers,
+  nowMilliseconds: number,
+  fetchElapsedSeconds: number,
+): number {
   const maxAge = parseMaxAge(headers.get("Cache-Control"));
   if (maxAge === 0) {
     return 0;
   }
 
-  const ageSeconds = parseAge(headers.get("Age"));
+  const ageSeconds = parseAge(headers.get("Age")) + fetchElapsedSeconds;
   const dateMilliseconds = Date.parse(headers.get("Date") ?? "");
   const apparentAgeSeconds = Number.isFinite(dateMilliseconds)
     ? Math.max(0, (nowMilliseconds - dateMilliseconds) / 1000)
@@ -141,6 +145,7 @@ async function fetchCertificates(
     }
   }
 
+  const fetchStartedAt = options.now();
   const response = await options.fetch(FIREBASE_CERTIFICATE_URL, {
     headers: { Accept: "application/json" },
   });
@@ -153,7 +158,12 @@ async function fetchCertificates(
   }
 
   const nowMilliseconds = options.now();
-  const cacheSeconds = remainingFreshnessSeconds(response.headers, nowMilliseconds);
+  const fetchElapsedSeconds = Math.max(0, (nowMilliseconds - fetchStartedAt) / 1000);
+  const cacheSeconds = remainingFreshnessSeconds(
+    response.headers,
+    nowMilliseconds,
+    fetchElapsedSeconds,
+  );
   if (options.cache && cacheSeconds > 0) {
     const headers = new Headers({
       "Cache-Control": `public, max-age=${cacheSeconds}`,
