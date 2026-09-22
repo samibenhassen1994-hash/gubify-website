@@ -84,9 +84,14 @@ export class FanoutSubrequestBudgetError extends FanoutProcessingError {
 
 class ExternalSubrequestBudget {
   used = 0;
+  readonly maximum: number;
+
+  constructor(maximum: number) {
+    this.maximum = maximum;
+  }
 
   async run<T>(operation: () => Promise<T>): Promise<T> {
-    if (this.used >= MAX_FANOUT_PROCESSING_SUBREQUESTS) {
+    if (this.used >= this.maximum) {
       throw new FanoutSubrequestBudgetError();
     }
     this.used += 1;
@@ -218,6 +223,7 @@ async function discoverRecipients(
   firestore: FirestoreRestClient,
   source: RecipientSource,
   cursor: string | null,
+  pageSize: number,
 ): Promise<DiscoveryPage> {
   if (source.kind === "users") {
     requireCondition(cursor === null);
@@ -227,7 +233,7 @@ async function discoverRecipients(
   if (source.kind === "gub_members") {
     const collectionPath = `gubs/${source.gubId}/members`;
     const page = await listDocuments(firestore, collectionPath, {
-      pageSize: RECIPIENT_PAGE_SIZE,
+      pageSize,
       pageToken: cursor ?? undefined,
       orderBy: "__name__",
       mask: ["userId"],
@@ -246,7 +252,7 @@ async function discoverRecipients(
     && isSafeIdentifier(community.fields.ownerId));
   const currentOwnerId = community.fields.ownerId;
   const page = await listDocuments(firestore, collectionPath, {
-    pageSize: RECIPIENT_PAGE_SIZE,
+    pageSize,
     pageToken: cursor ?? undefined,
     orderBy: "__name__",
     mask: ["active"],
@@ -474,14 +480,21 @@ function countFirestoreClient(
 
 export function createFanoutConsumer(
   dependencies: FanoutConsumerDependencies = {},
-): (message: FanoutMessage, env: FanoutConsumerEnv) => Promise<FanoutResult> {
+): (message: FanoutMessage, env: FanoutConsumerEnv, maximumSubrequests?: number) => Promise<FanoutResult> {
   const accessTokenCache: GoogleAccessTokenCache = {};
   const now = dependencies.now ?? Date.now;
 
-  return async (input, env) => {
+  return async (input, env, maximumSubrequests = MAX_FANOUT_PROCESSING_SUBREQUESTS) => {
     const message = parsePushQueueMessage(input);
     requireCondition(message.kind === "fanout");
-    const budget = new ExternalSubrequestBudget();
+    requireCondition(Number.isSafeInteger(maximumSubrequests)
+      && maximumSubrequests >= 18
+      && maximumSubrequests <= MAX_FANOUT_PROCESSING_SUBREQUESTS);
+    const budget = new ExternalSubrequestBudget(maximumSubrequests);
+    // Worst discovery page: 6 calls per recipient (liveness, create/read,
+    // DELIVERY send, CAS), plus 6 fixed calls including cold OAuth and the
+    // continuation. Reserve another 6 for the Community owner outside the page.
+    const pageSize = Math.min(RECIPIENT_PAGE_SIZE, Math.floor((maximumSubrequests - 12) / 6));
     const fetchImplementation = dependencies.fetch ?? globalThis.fetch;
     requireCondition(typeof fetchImplementation === "function");
 
@@ -522,6 +535,7 @@ export function createFanoutConsumer(
       firestore,
       stored.plan.recipientSource,
       stored.plan.fanout.cursor,
+      pageSize,
     );
     let recipientsProcessed = 0;
     for (const recipientUid of page.userIds) {

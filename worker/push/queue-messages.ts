@@ -3,6 +3,12 @@ const MAX_IDENTIFIER_LENGTH = 256;
 const MAX_CURSOR_LENGTH = 4096;
 export const MAX_QUEUE_BATCH_MESSAGES = 100;
 export const MAX_FANOUT_PROCESSING_SUBREQUESTS = 39;
+// Leave 16 KiB below Queue's 256 KiB aggregate limit, in addition to the
+// serialized JSON envelope, per-message metadata, and batch framing below.
+const MAX_DEFERRED_BATCH_BYTES = 240 * 1024;
+const MAX_QUEUE_MESSAGE_BYTES = 128 * 1024;
+const QUEUE_BATCH_ENVELOPE_BYTES = 1024;
+const QUEUE_MESSAGE_ENVELOPE_BYTES = 128;
 
 export interface FanoutMessage {
   kind: "fanout";
@@ -119,15 +125,13 @@ export function deliveryMessage(eventKey: string, recipientUid: string): Deliver
 
 export async function dispatchPushQueueBatch(
   batch: PushQueueBatch,
-  consumeFanout: (message: FanoutMessage) => Promise<{ externalSubrequests: number }>,
+  consumeFanout: (message: FanoutMessage, maximumSubrequests: number) => Promise<{ externalSubrequests: number }>,
   deferFanouts: (messages: FanoutMessage[]) => Promise<void>,
 ): Promise<PushQueueBatchDispatchResult> {
   if (!Array.isArray(batch.messages) || batch.messages.length > MAX_QUEUE_BATCH_MESSAGES) {
     throw new PushQueueMessageError();
   }
-  let processingSubrequests = 0;
-  let processedFanout = false;
-  const deferred: Array<{ queued: PushQueueBatchMessage; message: FanoutMessage }> = [];
+  const fanouts: Array<{ queued: PushQueueBatchMessage; message: FanoutMessage; bytes: number }> = [];
   for (const queued of batch.messages) {
     let message: PushQueueMessage;
     try {
@@ -142,39 +146,70 @@ export async function dispatchPushQueueBatch(
       continue;
     }
 
-    if (processedFanout) {
-      deferred.push({ queued, message });
-      continue;
-    }
-
-    processedFanout = true;
     try {
-      const result = await consumeFanout(message);
-      if (!Number.isSafeInteger(result.externalSubrequests)
-        || result.externalSubrequests < 0
-        || result.externalSubrequests > MAX_FANOUT_PROCESSING_SUBREQUESTS) {
-        throw new PushQueueMessageError();
+      const bytes = new TextEncoder().encode(JSON.stringify({ body: message, contentType: "json" })).byteLength
+        + QUEUE_MESSAGE_ENVELOPE_BYTES;
+      if (bytes >= MAX_QUEUE_MESSAGE_BYTES
+        || bytes + QUEUE_BATCH_ENVELOPE_BYTES > MAX_DEFERRED_BATCH_BYTES) {
+        // Deterministic poison, never a retry loop. The bounded schema keeps
+        // every valid 4096-character cursor well below this singleton limit.
+        queued.ack();
+        continue;
       }
-      processingSubrequests = result.externalSubrequests;
-      queued.ack();
+      fanouts.push({ queued, message, bytes });
     } catch {
-      // A failed consumer may have used its full allowance before throwing.
-      processingSubrequests = MAX_FANOUT_PROCESSING_SUBREQUESTS;
-      queued.retry();
+      queued.ack();
     }
   }
 
-  if (deferred.length === 0) {
-    return { externalSubrequests: processingSubrequests };
+  const first = fanouts.shift();
+  if (!first) return { externalSubrequests: 0 };
+  const deferredBatches: typeof fanouts[] = [];
+  let deferred: typeof fanouts = [];
+  let batchBytes = QUEUE_BATCH_ENVELOPE_BYTES;
+  for (const item of fanouts) {
+    if (deferred.length >= MAX_QUEUE_BATCH_MESSAGES
+      || batchBytes + item.bytes > MAX_DEFERRED_BATCH_BYTES) {
+      deferredBatches.push(deferred);
+      deferred = [];
+      batchBytes = QUEUE_BATCH_ENVELOPE_BYTES;
+    }
+    deferred.push(item);
+    batchBytes += item.bytes;
+  }
+  if (deferred.length > 0) deferredBatches.push(deferred);
+
+  // Plan every send before doing external work. The current schema permits
+  // at most 13 chunks of 99 deferred messages, leaving >=27 processing calls.
+  const maximumProcessingSubrequests = Math.min(
+    MAX_FANOUT_PROCESSING_SUBREQUESTS,
+    MAX_FANOUT_PROCESSING_SUBREQUESTS + 1 - deferredBatches.length,
+  );
+  let processingSubrequests = 0;
+  try {
+    const result = await consumeFanout(first.message, maximumProcessingSubrequests);
+    if (!Number.isSafeInteger(result.externalSubrequests)
+      || result.externalSubrequests < 0
+      || result.externalSubrequests > maximumProcessingSubrequests) {
+      throw new PushQueueMessageError();
+    }
+    processingSubrequests = result.externalSubrequests;
+    first.queued.ack();
+  } catch {
+    // A failed consumer may have used its full allowance before throwing.
+    processingSubrequests = maximumProcessingSubrequests;
+    first.queued.retry();
   }
 
-  try {
-    await deferFanouts(deferred.map(({ message }) => message));
-    for (const { queued } of deferred) queued.ack();
-  } catch {
-    // A failed durable deferral retains originals. Only this outage path
-    // consumes a retry attempt; accepted deferrals never do.
-    for (const { queued } of deferred) queued.retry();
+  for (const chunk of deferredBatches) {
+    try {
+      await deferFanouts(chunk.map(({ message }) => message));
+      for (const { queued } of chunk) queued.ack();
+    } catch {
+      // Acceptance/ack is independent per chunk. A failed send retains only
+      // its originals; accepted chunks never spend their retry allowance.
+      for (const { queued } of chunk) queued.retry();
+    }
   }
-  return { externalSubrequests: processingSubrequests + 1 };
+  return { externalSubrequests: processingSubrequests + deferredBatches.length };
 }

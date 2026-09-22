@@ -911,3 +911,239 @@ test("FANOUT Queue deferral failure retries originals instead of acknowledging l
   assert.deepEqual(outcomes, ["ack:0", "retry:1"]);
   assert.equal(result.externalSubrequests, 4);
 });
+
+for (const [encoding, cursor] of [
+  ["ASCII", "x".repeat(4096)],
+  ["UTF-8", "界".repeat(4096)],
+  ["JSON escapes", "\u0000".repeat(4096)],
+]) test(`FANOUT Queue byte-bounded deferrals drain ${encoding} jobs before finite retries exhaust`, async (t) => {
+  const aggregateByteLimit = 256 * 1024;
+  const maximumRetries = 2;
+  // Finite modeled quota, charged per message write/read/delete, not merely
+  // per sendBatch call. Production daily quota still needs rollout review.
+  const maximumQueueOperations = 20_000;
+  const encoder = new TextEncoder();
+  const initialMessages = Array.from({ length: 100 }, (_, index) => ({
+    kind: "fanout",
+    eventKey: `event-${String(index).padStart(3, "0")}-${'"'.repeat(1490)}`,
+    cursor,
+  }));
+  const serializedBytes = (messages) => messages.reduce(
+    (total, message) => total + encoder.encode(JSON.stringify({ body: message, contentType: "json" })).byteLength + 128,
+    1024,
+  );
+  assert.ok(serializedBytes(initialMessages) > aggregateByteLimit, "fixture exceeds one sendBatch");
+
+  const pending = initialMessages.map((body) => ({ body, retries: 0 }));
+  const processed = [];
+  const exhausted = [];
+  const attemptedBatchBytes = [];
+  const processingAllowances = [];
+  const invocationSubrequests = [];
+  let retryCount = 0;
+  let queueOperations = initialMessages.length;
+  const chargeQueueOperations = (count) => {
+    queueOperations += count;
+    if (queueOperations > maximumQueueOperations) throw new Error("Queue quota exhausted");
+  };
+
+  while (pending.length > 0 && invocationSubrequests.length < 200) {
+    const current = pending.splice(0, 100);
+    chargeQueueOperations(current.length);
+    let actualSubrequests = 0;
+    const settled = new Set();
+    const queued = current.map((item) => ({
+      body: item.body,
+      ack() {
+        assert.ok(!settled.has(item));
+        chargeQueueOperations(1);
+        settled.add(item);
+      },
+      retry() {
+        assert.ok(!settled.has(item));
+        settled.add(item);
+        retryCount += 1;
+        if (item.retries >= maximumRetries) exhausted.push(item.body.eventKey);
+        else pending.push({ body: item.body, retries: item.retries + 1 });
+      },
+    }));
+    const result = await queueModule.dispatchPushQueueBatch(
+      { messages: queued },
+      async (message, maximumProcessingSubrequests) => {
+        processed.push(message.eventKey);
+        const allowance = maximumProcessingSubrequests ?? 39;
+        processingAllowances.push(allowance);
+        actualSubrequests += allowance;
+        return { externalSubrequests: allowance };
+      },
+      async (messages) => {
+        actualSubrequests += 1;
+        assert.ok(messages.length > 0 && messages.length <= 100);
+        const bytes = serializedBytes(messages);
+        attemptedBatchBytes.push(bytes);
+        if (bytes >= aggregateByteLimit) throw new Error("sendBatch aggregate payload too large");
+        chargeQueueOperations(messages.length);
+        pending.push(...messages.map((body) => ({ body: structuredClone(body), retries: 0 })));
+      },
+    );
+    invocationSubrequests.push(result.externalSubrequests);
+    assert.equal(settled.size, current.length, "every original is explicitly settled");
+    assert.equal(result.externalSubrequests, actualSubrequests);
+  }
+
+  assert.equal(pending.length, 0);
+  assert.equal(exhausted.length, 0);
+  assert.equal(new Set(processed).size, 100);
+  assert.equal(processed.length, 100);
+  assert.equal(retryCount, 0, "valid deferred jobs never spend original retry attempts");
+  assert.ok(attemptedBatchBytes.every((bytes) => bytes < aggregateByteLimit));
+  assert.ok(queueOperations <= maximumQueueOperations);
+  assert.ok(processingAllowances.some((allowance) => allowance < 39));
+  assert.ok(invocationSubrequests.every((count) => count <= 40));
+  t.diagnostic(`${encoding}: 100 jobs drained in ${invocationSubrequests.length} invocations; ${attemptedBatchBytes.length} Queue sends; ${queueOperations}/${maximumQueueOperations} Queue operations; max ${Math.max(...attemptedBatchBytes)} bytes; max ${Math.max(...invocationSubrequests)} calls; zero retries`);
+});
+
+test("FANOUT Queue oversized poison is acknowledged while a valid maximum cursor progresses", async () => {
+  const outcomes = [];
+  const valid = { kind: "fanout", eventKey: "valid", cursor: "\u0000".repeat(4096) };
+  const messages = [
+    { kind: "fanout", eventKey: "poison", cursor: "x".repeat(256 * 1024) },
+    { kind: "fanout", eventKey: "first" },
+    valid,
+  ].map((body, index) => ({
+    body,
+    ack() { outcomes[index] = "ack"; },
+    retry() { outcomes[index] = "retry"; },
+  }));
+  const deferred = [];
+  await queueModule.dispatchPushQueueBatch(
+    { messages },
+    async () => ({ externalSubrequests: 1 }),
+    async (batch) => { deferred.push(...batch); },
+  );
+  assert.deepEqual(outcomes, ["ack", "ack", "ack"]);
+  assert.deepEqual(deferred, [valid]);
+});
+
+test("FANOUT byte-heavy deferrals reserve enough budget for real moderator discovery pages", async (t) => {
+  const db = memoryFirestore();
+  const fanoutQueue = queueFake();
+  const deliveryQueue = queueFake();
+  const eventKey = "community_join_request_created__c__requester__cycle";
+  db.put(`pushDeliveryEvents/${eventKey}`, planFields({
+    eventKey,
+    type: "community_join_request_created",
+    recipientSource: { kind: "community_moderators", communityId: "c", ownerId: "owner", excludeUid: "requester" },
+  }));
+  db.put("communities/c", { ownerId: "owner" });
+  for (const uid of ["owner", "admin-a", "admin-b", "admin-c", "admin-d", "admin-e"]) {
+    putActiveUser(db, uid);
+    if (uid !== "owner") db.put(`platformAdmins/${uid}`, { active: true });
+    db.put(`pushDeliveryEvents/${eventKey}/recipients/${uid}`, {
+      schemaVersion: 1, eventKey, recipientUid: uid, status: "pending", attempts: 0,
+      createdAt: new Date("2026-09-21T10:00:00.000Z"),
+    });
+  }
+  // One counted call stands in for cold OAuth, with all remaining calls using
+  // the real consumer, Firestore REST adapter, and deterministic record store.
+  let oauthCalls = 0;
+  const consume = fanoutModule.createFanoutConsumer({
+    fetch: async (input, init) => {
+      if (String(input).includes("oauth2.googleapis.com")) {
+        oauthCalls += 1;
+        return Response.json({ access_token: "test-token", expires_in: 3600 });
+      }
+      return db.client.fetch(input, init);
+    },
+    crypto: {
+      subtle: {
+        async importKey() { return {}; },
+        async sign() { return new Uint8Array([1, 2, 3]).buffer; },
+      },
+    },
+    now: () => NOW.getTime(),
+  });
+  let current = { kind: "fanout", eventKey };
+  const invocationCounts = [];
+  for (let page = 0; page < 6; page += 1) {
+    const before = db.calls.length + fanoutQueue.attempts + deliveryQueue.attempts + oauthCalls;
+    let deferralCalls = 0;
+    const outcomes = [];
+    const messages = [current, ...Array.from({ length: 99 }, (_, index) => ({
+      kind: "fanout", eventKey: `${index}-${'"'.repeat(1490)}`, cursor: "\u0000".repeat(4096),
+    }))].map((body, index) => ({
+      body,
+      ack() { outcomes[index] = "ack"; },
+      retry() { outcomes[index] = "retry"; },
+    }));
+    const result = await queueModule.dispatchPushQueueBatch(
+      { messages },
+      (message, allowance) => consume(message, {
+        ...env(fanoutQueue, deliveryQueue),
+        // Deliberately invalid key material; the injected signer only counts calls.
+        FIREBASE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\nAQID\n-----END PRIVATE KEY-----",
+      }, allowance),
+      async (batch) => {
+        deferralCalls += 1;
+        const bytes = Buffer.byteLength(JSON.stringify(batch.map((body) => ({ body, contentType: "json" }))));
+        assert.ok(bytes + batch.length * 128 + 1024 < 256 * 1024);
+      },
+    );
+    const actual = db.calls.length + fanoutQueue.attempts + deliveryQueue.attempts + oauthCalls - before + deferralCalls;
+    invocationCounts.push(actual);
+    assert.equal(result.externalSubrequests, actual);
+    assert.ok(actual <= 40, `actual invocation used ${actual} calls`);
+    assert.ok(deferralCalls > 1);
+    assert.ok(outcomes.every((outcome) => outcome === "ack"), "no budget retries for valid work");
+    if (db.decoded(`pushDeliveryEvents/${eventKey}`).fields.fanout.completed) break;
+    assert.notDeepEqual(fanoutQueue.accepted.at(-1), current, "discovery cursor must advance");
+    current = fanoutQueue.accepted.at(-1);
+  }
+  assert.equal(db.decoded(`pushDeliveryEvents/${eventKey}`).fields.fanout.completed, true);
+  assert.equal(oauthCalls, 1);
+  assert.equal(deliveryQueue.accepted.length, 6);
+  assert.equal(new Set(deliveryQueue.accepted.map((message) => message.recipientUid)).size, 6);
+  assert.ok([...db.documents.keys()].every((path) => !path.includes("pushNotifications")));
+  t.diagnostic(`Real moderator discovery: ${invocationCounts.join(", ")} actual calls per invocation, including cold OAuth and deferrals; six unique recipients`);
+});
+
+test("FANOUT byte-safe chunks settle independently after consumer and partial Queue failures", async () => {
+  const bodies = Array.from({ length: 30 }, (_, index) => ({
+    kind: "fanout", eventKey: `event-${index}`, cursor: "\u0000".repeat(4096),
+  }));
+  const outcomes = new Map();
+  const accepted = new Set();
+  const failed = new Set();
+  let processingAllowance;
+  let sends = 0;
+  const result = await queueModule.dispatchPushQueueBatch(
+    { messages: bodies.map((body) => ({
+      body,
+      ack() { outcomes.set(body.eventKey, "ack"); },
+      retry() { outcomes.set(body.eventKey, "retry"); },
+    })) },
+    async (_message, allowance) => {
+      processingAllowance = allowance;
+      throw new Error("consumer fails after spending its allowance");
+    },
+    async (messages) => {
+      sends += 1;
+      assert.ok(messages.every((message) => !outcomes.has(message.eventKey)), "no ack before acceptance");
+      const bytes = Buffer.byteLength(JSON.stringify(messages.map((body) => ({ body, contentType: "json" }))));
+      assert.ok(bytes + messages.length * 128 + 1024 < 256 * 1024);
+      if (sends === 2) {
+        for (const message of messages) failed.add(message.eventKey);
+        throw new Error("one chunk unavailable");
+      }
+      for (const message of messages) accepted.add(message.eventKey);
+    },
+  );
+  assert.ok(sends > 2, "later chunks still make progress after a failed chunk");
+  assert.equal(result.externalSubrequests, processingAllowance + sends);
+  assert.equal(result.externalSubrequests, 40);
+  assert.equal(outcomes.get("event-0"), "retry");
+  assert.ok(failed.size > 0);
+  assert.equal(accepted.size + failed.size, 29);
+  for (const eventKey of accepted) assert.equal(outcomes.get(eventKey), "ack");
+  for (const eventKey of failed) assert.equal(outcomes.get(eventKey), "retry");
+});

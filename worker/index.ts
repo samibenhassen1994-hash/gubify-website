@@ -174,11 +174,12 @@ const worker = {
   async queue(batch: PushQueueBatch, env: Env): Promise<void> {
     // Cloudflare's subrequest cap applies to the whole Queue invocation, not
     // independently to every message in a delivered batch. Process at most
-    // one FANOUT message and retry the remainder so the 40-call budget holds
+    // one FANOUT message and durably defer the remainder in byte-safe chunks
+    // with reserved subrequests, so the 40-call budget holds
     // even if an external Queue configuration later uses batches above one.
     await dispatchPushQueueBatch(
       batch,
-      (message) => handleFanoutMessage(message, env),
+      (message, maximumSubrequests) => handleFanoutMessage(message, env, maximumSubrequests),
       (messages) => env.PUSH_FANOUT_QUEUE.sendBatch(messages.map((body) => ({ body }))),
     );
   },
