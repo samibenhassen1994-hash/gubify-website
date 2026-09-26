@@ -127,11 +127,15 @@ export async function dispatchPushQueueBatch(
   batch: PushQueueBatch,
   consumeFanout: (message: FanoutMessage, maximumSubrequests: number) => Promise<{ externalSubrequests: number }>,
   deferFanouts: (messages: FanoutMessage[]) => Promise<void>,
+  delivery?: {
+    consume: (message: DeliveryMessage, maximumSubrequests: number) => Promise<{ externalSubrequests: number }>;
+    defer: (messages: DeliveryMessage[]) => Promise<void>;
+  },
 ): Promise<PushQueueBatchDispatchResult> {
   if (!Array.isArray(batch.messages) || batch.messages.length > MAX_QUEUE_BATCH_MESSAGES) {
     throw new PushQueueMessageError();
   }
-  const fanouts: Array<{ queued: PushQueueBatchMessage; message: FanoutMessage; bytes: number }> = [];
+  const fanouts: Array<{ queued: PushQueueBatchMessage; message: PushQueueMessage; bytes: number }> = [];
   for (const queued of batch.messages) {
     let message: PushQueueMessage;
     try {
@@ -141,7 +145,7 @@ export async function dispatchPushQueueBatch(
       continue;
     }
 
-    if (message.kind === "delivery") {
+    if (message.kind === "delivery" && !delivery) {
       queued.retry();
       continue;
     }
@@ -164,11 +168,15 @@ export async function dispatchPushQueueBatch(
 
   const first = fanouts.shift();
   if (!first) return { externalSubrequests: 0 };
+  // Group by destination Queue before chunking. Alternating message kinds must
+  // not turn a bounded 100-message batch into 99 separate sendBatch calls.
+  fanouts.sort((left, right) => left.message.kind.localeCompare(right.message.kind));
   const deferredBatches: typeof fanouts[] = [];
   let deferred: typeof fanouts = [];
   let batchBytes = QUEUE_BATCH_ENVELOPE_BYTES;
   for (const item of fanouts) {
-    if (deferred.length >= MAX_QUEUE_BATCH_MESSAGES
+    if ((deferred.length > 0 && deferred[0].message.kind !== item.message.kind)
+      || deferred.length >= MAX_QUEUE_BATCH_MESSAGES
       || batchBytes + item.bytes > MAX_DEFERRED_BATCH_BYTES) {
       deferredBatches.push(deferred);
       deferred = [];
@@ -180,14 +188,16 @@ export async function dispatchPushQueueBatch(
   if (deferred.length > 0) deferredBatches.push(deferred);
 
   // Plan every send before doing external work. The current schema permits
-  // at most 13 chunks of 99 deferred messages, leaving >=27 processing calls.
+  // at most 14 chunks for mixed kinds, leaving >=26 processing calls.
   const maximumProcessingSubrequests = Math.min(
     MAX_FANOUT_PROCESSING_SUBREQUESTS,
     MAX_FANOUT_PROCESSING_SUBREQUESTS + 1 - deferredBatches.length,
   );
   let processingSubrequests = 0;
   try {
-    const result = await consumeFanout(first.message, maximumProcessingSubrequests);
+    const result = first.message.kind === "fanout"
+      ? await consumeFanout(first.message, maximumProcessingSubrequests)
+      : await delivery!.consume(first.message, maximumProcessingSubrequests);
     if (!Number.isSafeInteger(result.externalSubrequests)
       || result.externalSubrequests < 0
       || result.externalSubrequests > maximumProcessingSubrequests) {
@@ -203,7 +213,11 @@ export async function dispatchPushQueueBatch(
 
   for (const chunk of deferredBatches) {
     try {
-      await deferFanouts(chunk.map(({ message }) => message));
+      if (chunk[0].message.kind === "fanout") {
+        await deferFanouts(chunk.map(({ message }) => message as FanoutMessage));
+      } else {
+        await delivery!.defer(chunk.map(({ message }) => message as DeliveryMessage));
+      }
       for (const { queued } of chunk) queued.ack();
     } catch {
       // Acceptance/ack is independent per chunk. A failed send retains only

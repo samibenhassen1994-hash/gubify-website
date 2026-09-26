@@ -2,7 +2,8 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { handleFanoutMessage } from "./push/fanout-consumer.ts";
-import { handlePushEventRequest, type PushQueue } from "./push/handler.ts";
+import { handleDeliveryMessage } from "./push/delivery-consumer.ts";
+import { handlePushEventRequest, type PushBatchQueue } from "./push/handler.ts";
 import {
   dispatchPushQueueBatch,
   type DeliveryMessage,
@@ -17,8 +18,8 @@ export interface Env {
   FIREBASE_PROJECT_ID: string;
   FIREBASE_CLIENT_EMAIL: string;
   FIREBASE_PRIVATE_KEY: string;
-  PUSH_FANOUT_QUEUE: PushQueue<FanoutMessage>;
-  PUSH_DELIVERY_QUEUE: PushQueue<DeliveryMessage>;
+  PUSH_FANOUT_QUEUE: PushBatchQueue<FanoutMessage>;
+  PUSH_DELIVERY_QUEUE: PushBatchQueue<DeliveryMessage>;
   PUSH_EVENTS_RATE_LIMITER: PushRateLimiter;
   IMAGES: {
     input(stream: ReadableStream): {
@@ -174,13 +175,17 @@ const worker = {
   async queue(batch: PushQueueBatch, env: Env): Promise<void> {
     // Cloudflare's subrequest cap applies to the whole Queue invocation, not
     // independently to every message in a delivered batch. Process at most
-    // one FANOUT message and durably defer the remainder in byte-safe chunks
+    // one FANOUT or DELIVERY message and defer the remainder in byte-safe chunks
     // with reserved subrequests, so the 40-call budget holds
     // even if an external Queue configuration later uses batches above one.
     await dispatchPushQueueBatch(
       batch,
       (message, maximumSubrequests) => handleFanoutMessage(message, env, maximumSubrequests),
       (messages) => env.PUSH_FANOUT_QUEUE.sendBatch(messages.map((body) => ({ body }))),
+      {
+        consume: (message, maximumSubrequests) => handleDeliveryMessage(message, env, maximumSubrequests),
+        defer: (messages) => env.PUSH_DELIVERY_QUEUE.sendBatch(messages.map((body) => ({ body }))),
+      },
     );
   },
 };
