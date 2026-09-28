@@ -142,6 +142,58 @@ test("verifies a complete RS256 Firebase ID token and returns its bounded subjec
   assert.equal(verified.claims.aud, PROJECT_ID);
 });
 
+test("does not log temporary token-verification diagnostics", async () => {
+  const originalConsoleError = console.error;
+  const logs = [];
+  console.error = (...values) => logs.push(values);
+  try {
+    await assert.rejects(
+      authModule.verifyFirebaseIdToken(
+        await signer.token(),
+        PROJECT_ID,
+        verificationOptions({}, {
+          fetch: async () => {
+            throw new TypeError("private-token-value");
+          },
+        }),
+      ),
+      /private-token-value/,
+    );
+  } finally {
+    console.error = originalConsoleError;
+  }
+
+  assert.deepEqual(logs, []);
+});
+
+test("preserves the global fetch receiver for certificate retrieval", async () => {
+  const originalFetch = globalThis.fetch;
+  let receiver;
+  globalThis.fetch = async function () {
+    receiver = this;
+    if (this !== globalThis) {
+      throw new TypeError("Illegal invocation");
+    }
+    return Response.json(
+      { [signer.kid]: signer.certificatePem },
+      { headers: { "Cache-Control": "max-age=3600" } },
+    );
+  };
+
+  try {
+    const verified = await authModule.verifyFirebaseIdToken(
+      await signer.token(),
+      PROJECT_ID,
+      { cache: new MemoryCache(), now: () => NOW_SECONDS * 1000 },
+    );
+    assert.equal(verified.uid, "firebase-user-1");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(receiver, globalThis);
+});
+
 test("rejects wrong algorithms, missing kids, unknown kids, and invalid signatures", async () => {
   const otherSigner = await createSigner("other-kid");
   const wrongKeyPair = await crypto.subtle.generateKey(
@@ -476,15 +528,24 @@ test("verified-UID limiting happens immediately after authentication and before 
   assert.deepEqual(queueMessages, []);
 });
 
-test("the authenticated handler stays fail-closed when service credentials are unavailable", async () => {
+test("the authenticated handler fails closed without temporary diagnostics", async () => {
+  const originalConsoleError = console.error;
+  const logs = [];
+  console.error = (...values) => logs.push(values);
   const handle = handlerModule.createPushEventRequestHandler({
     async verifyFirebaseIdToken() {
       return { uid: "firebase-user-1", claims: {} };
     },
   });
   const { env, queueMessages } = handlerEnv([true, true]);
-  const response = await handle(validHandlerRequest(), env, {});
+  let response;
+  try {
+    response = await handle(validHandlerRequest(), env, {});
+  } finally {
+    console.error = originalConsoleError;
+  }
 
   assert.equal(response.status, 503);
   assert.deepEqual(queueMessages, []);
+  assert.deepEqual(logs, []);
 });

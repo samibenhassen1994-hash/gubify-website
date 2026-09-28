@@ -303,9 +303,12 @@ export async function verifyFirebaseIdToken(
   }
   const claims = decodeJsonPart(parts[1]);
   const cryptoImplementation = providedOptions.crypto ?? globalThis.crypto;
+  const fetchImplementation: typeof fetch = providedOptions.fetch ?? (
+    (input, init) => globalThis.fetch(input, init)
+  );
   const options = {
     cache: providedOptions.cache ?? defaultCertificateCache(),
-    fetch: providedOptions.fetch ?? globalThis.fetch,
+    fetch: fetchImplementation,
     now: providedOptions.now ?? Date.now,
   };
   if (!cryptoImplementation?.subtle || typeof options.fetch !== "function") {
