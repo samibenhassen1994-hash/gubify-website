@@ -11,6 +11,44 @@ const countDatabase = {
   database_id: "8e4b92c0-c106-4639-93b7-555522433af8",
 };
 
+const pushQueues = {
+  producers: [
+    {
+      binding: "PUSH_FANOUT_QUEUE",
+      queue: "gubify-push-fanout-v1",
+    },
+    {
+      binding: "PUSH_DELIVERY_QUEUE",
+      queue: "gubify-push-delivery-v1",
+    },
+  ],
+  consumers: [
+    {
+      queue: "gubify-push-fanout-v1",
+      max_batch_size: 10,
+      max_batch_timeout: 5,
+      max_retries: 5,
+    },
+    {
+      queue: "gubify-push-delivery-v1",
+      max_batch_size: 10,
+      max_batch_timeout: 5,
+      max_retries: 5,
+    },
+  ],
+};
+
+const pushRateLimits = [
+  {
+    name: "PUSH_EVENTS_RATE_LIMITER",
+    namespace_id: "1001",
+    simple: {
+      limit: 30,
+      period: 60,
+    },
+  },
+];
+
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
@@ -20,6 +58,8 @@ const workerConfig = {
   vars: {
     FIREBASE_PROJECT_ID: "gubify-a3e2c",
   },
+  queues: pushQueues,
+  ratelimits: pushRateLimits,
   d1_databases: [countDatabase],
   r2_buckets: r2
     ? [

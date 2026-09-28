@@ -1,10 +1,26 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import { handleFanoutMessage } from "./push/fanout-consumer.ts";
+import { handleDeliveryMessage } from "./push/delivery-consumer.ts";
+import { handlePushEventRequest, type PushBatchQueue } from "./push/handler.ts";
+import {
+  dispatchPushQueueBatch,
+  type DeliveryMessage,
+  type FanoutMessage,
+  type PushQueueBatch,
+} from "./push/queue-messages.ts";
+import type { PushRateLimiter } from "./push/rate-limit.ts";
 
-interface Env {
+export interface Env {
   ASSETS: Fetcher;
   COUNT: D1Database;
+  FIREBASE_PROJECT_ID: string;
+  FIREBASE_CLIENT_EMAIL: string;
+  FIREBASE_PRIVATE_KEY: string;
+  PUSH_FANOUT_QUEUE: PushBatchQueue<FanoutMessage>;
+  PUSH_DELIVERY_QUEUE: PushBatchQueue<DeliveryMessage>;
+  PUSH_EVENTS_RATE_LIMITER: PushRateLimiter;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -120,6 +136,10 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    if (url.pathname === "/api/push/events") {
+      return handlePushEventRequest(request, env, ctx);
+    }
+
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
       return handleImageOptimization(request, {
@@ -149,6 +169,23 @@ const worker = {
       ctx,
       () => handler.fetch(request, env, ctx),
       (caches as CacheStorage & { default: Cache }).default,
+    );
+  },
+
+  async queue(batch: PushQueueBatch, env: Env): Promise<void> {
+    // Cloudflare's subrequest cap applies to the whole Queue invocation, not
+    // independently to every message in a delivered batch. Process at most
+    // one FANOUT or DELIVERY message and defer the remainder in byte-safe chunks
+    // with reserved subrequests, so the 40-call budget holds
+    // even if an external Queue configuration later uses batches above one.
+    await dispatchPushQueueBatch(
+      batch,
+      (message, maximumSubrequests) => handleFanoutMessage(message, env, maximumSubrequests),
+      (messages) => env.PUSH_FANOUT_QUEUE.sendBatch(messages.map((body) => ({ body }))),
+      {
+        consume: (message, maximumSubrequests) => handleDeliveryMessage(message, env, maximumSubrequests),
+        defer: (messages) => env.PUSH_DELIVERY_QUEUE.sendBatch(messages.map((body) => ({ body }))),
+      },
     );
   },
 };
