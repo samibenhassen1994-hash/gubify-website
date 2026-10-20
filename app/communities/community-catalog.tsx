@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { PublicCommunityCatalogItem } from "../../lib/community-catalog";
 import {
@@ -25,68 +25,27 @@ function accessModeLabel(accessMode: PublicCommunityCatalogItem["accessMode"]) {
   return accessMode === "open" ? "Open" : "Approval";
 }
 
-export default function CommunityCatalog() {
-  const [communities, setCommunities] = useState<PublicCommunityCatalogItem[] | null>(null);
-  const [loadError, setLoadError] = useState(false);
+type CommunityCatalogProps = {
+  initialCommunities: PublicCommunityCatalogItem[];
+};
+
+export default function CommunityCatalog({
+  initialCommunities,
+}: CommunityCatalogProps) {
   const [filters, setFilters] = useState(initialFilters);
 
-  useEffect(() => {
-    let active = true;
-    void fetch("/api/communities", {
-      headers: { Accept: "application/json" },
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Community catalog unavailable");
-        return response.json() as Promise<{ communities?: unknown }>;
-      })
-      .then((payload) => {
-        if (!active || !Array.isArray(payload.communities)) {
-          if (active) setLoadError(true);
-          return;
-        }
-        setCommunities(payload.communities as PublicCommunityCatalogItem[]);
-      })
-      .catch(() => {
-        if (active) setLoadError(true);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
   const languages = useMemo(
-    () => (communities ? getCatalogLanguages(communities) : []),
-    [communities],
+    () => getCatalogLanguages(initialCommunities),
+    [initialCommunities],
   );
   const categories = useMemo(
-    () => (communities ? getCatalogCategories(communities) : []),
-    [communities],
+    () => getCatalogCategories(initialCommunities),
+    [initialCommunities],
   );
   const results = useMemo(
-    () => (communities ? filterAndSortCommunities(communities, filters) : []),
-    [communities, filters],
+    () => filterAndSortCommunities(initialCommunities, filters),
+    [initialCommunities, filters],
   );
-
-  if (loadError) {
-    return (
-      <section className={styles.catalog} aria-labelledby="catalog-status">
-        <p className={styles.error} id="catalog-status" role="alert">
-          Communities are temporarily unavailable. Please try again later.
-        </p>
-      </section>
-    );
-  }
-
-  if (!communities) {
-    return (
-      <section className={styles.catalog} aria-labelledby="catalog-status">
-        <p className={styles.loading} id="catalog-status" role="status">
-          Loading communities…
-        </p>
-      </section>
-    );
-  }
 
   return (
     <section className={styles.catalog} aria-labelledby="catalog-controls-title">

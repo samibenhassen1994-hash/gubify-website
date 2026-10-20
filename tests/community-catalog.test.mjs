@@ -292,3 +292,24 @@ test("rejects malformed envelopes and upstream errors instead of returning an em
     );
   }
 });
+
+test("returns a thousand public Communities without an artificial catalog cap", async () => {
+  const entries = Array.from({ length: 1000 }, (_, index) =>
+    publicCommunity(index + 1),
+  );
+  const firestore = paginatedFirestore(entries);
+  const result = await fetchPublicCommunityCatalog({
+    projectId,
+    fetcher: firestore.fetcher,
+  });
+
+  assert.equal(result.length, 1000);
+  assert.equal(new Set(result.map((community) => community.slug)).size, 1000);
+  assert.equal(firestore.requests.length, 11);
+  assert.equal(
+    firestore.requests.every(
+      ({ body }) => body.structuredQuery.limit === 100,
+    ),
+    true,
+  );
+});

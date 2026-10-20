@@ -14,6 +14,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 1,
     },
     {
+      url: "https://gubify.com/communities",
+      lastModified: new Date("2026-10-20T00:00:00+02:00"),
+      changeFrequency: "daily",
+      priority: 0.9,
+    },
+    {
       url: "https://gubify.com/support",
       lastModified: new Date("2026-07-29T00:00:00+02:00"),
       changeFrequency: "monthly",

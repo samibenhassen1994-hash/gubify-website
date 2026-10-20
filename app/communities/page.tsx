@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { fetchPublicCommunityCatalog } from "../../lib/community-catalog";
 import LegalFooter from "../legal-footer";
 import SiteHeader from "../site-header";
 
@@ -13,7 +14,9 @@ export const metadata: Metadata = {
   alternates: { canonical: "/communities" },
 };
 
-export default function CommunitiesPage() {
+export default async function CommunitiesPage() {
+  const communities = await fetchPublicCommunityCatalog();
+
   return (
     <>
       <SiteHeader />
@@ -26,7 +29,7 @@ export default function CommunitiesPage() {
             matter to you.
           </p>
         </section>
-        <CommunityCatalog />
+        <CommunityCatalog initialCommunities={communities} />
       </main>
       <LegalFooter />
     </>

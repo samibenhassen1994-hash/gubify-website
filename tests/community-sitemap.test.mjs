@@ -141,6 +141,7 @@ test("maps updatedAt to sitemap lastModified and preserves every static URL", as
   const urls = result.map((entry) => entry.url);
   const expectedStaticUrls = [
     "https://gubify.com",
+    "https://gubify.com/communities",
     "https://gubify.com/support",
     "https://gubify.com/privacy",
     "https://gubify.com/pre-register",
