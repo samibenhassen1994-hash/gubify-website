@@ -22,20 +22,6 @@ const pushQueues = {
       queue: "gubify-push-delivery-v1",
     },
   ],
-  consumers: [
-    {
-      queue: "gubify-push-fanout-v1",
-      max_batch_size: 10,
-      max_batch_timeout: 5,
-      max_retries: 5,
-    },
-    {
-      queue: "gubify-push-delivery-v1",
-      max_batch_size: 10,
-      max_batch_timeout: 5,
-      max_retries: 5,
-    },
-  ],
 };
 
 const pushRateLimits = [
