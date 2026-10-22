@@ -1,5 +1,7 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
+
 import { communityLaunchTarget } from "../../../lib/gubify-app-links";
 
 import styles from "./community.module.css";
@@ -8,10 +10,19 @@ type CommunityCtaProps = {
   slug: string;
 };
 
+const subscribeToClientEnvironment = () => () => {};
+
 export default function CommunityCta({ slug }: CommunityCtaProps) {
+  const target = useSyncExternalStore(
+    subscribeToClientEnvironment,
+    () => communityLaunchTarget(slug, window.navigator.userAgent),
+    () => null,
+  );
+
+  if (!target) return null;
+
   function openCommunity() {
-    const target = communityLaunchTarget(slug, window.navigator.userAgent);
-    if (target) window.location.assign(target);
+    window.location.assign(target);
   }
 
   return (
