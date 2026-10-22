@@ -99,7 +99,8 @@ test("renders one public Community request with image and complete metadata", as
       );
       assert.match(html, /<div[^>]*class=["'][^"']*imageFrame[^"']*["'][^>]*>[\s\S]*?<img/i);
       assert.match(html, /<div[^>]*class=["'][^"']*content[^"']*["'][^>]*>[\s\S]*?Public Community[\s\S]*?<h1[^>]*>Football Italia<\/h1>[\s\S]*?Italian football fans\./i);
-      assert.match(html, /<button(?=[^>]*disabled)(?=[^>]*aria-disabled=["']true["'])[^>]*>Entra nella community<\/button>/i);
+      assert.match(html, /<button(?=[^>]*aria-disabled=["']false["'])[^>]*>Entra nella community<\/button>/i);
+      assert.doesNotMatch(html, /<button(?=[^>]*\sdisabled(?:[=\s>]))[^>]*>Entra nella community<\/button>/i);
       assert.match(html, /<button[^>]*>Share Community<\/button>/i);
       assert.doesNotMatch(html, /href=["'](?:gubify|https?:\/\/[^"']*(?:play\.google|apps\.apple))/i);
       assert.match(communityCss, /\.imageFrame\s*\{[^}]*border-radius:\s*50%/s);
@@ -145,7 +146,7 @@ test("renders a Community without an image or Open Graph image metadata", async 
       assert.doesNotMatch(html, /<img\b/i);
       assert.doesNotMatch(html, /property=["']og:image["']/i);
       assert.doesNotMatch(html, /name=["']twitter:image["']/i);
-      assert.match(html, /<button(?=[^>]*disabled)[^>]*>Entra nella community<\/button>/i);
+      assert.match(html, /<button(?=[^>]*aria-disabled=["']false["'])[^>]*>Entra nella community<\/button>/i);
 });
 
 test("returns 404 for invalid and nonexistent Community slugs", async () => {
