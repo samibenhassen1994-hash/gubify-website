@@ -74,7 +74,7 @@ test("Discover hub renders real-topic navigation and links to existing public Co
   assert.match(html,/href=["']\/discover\/anime["']/i);
   assert.match(html,/href=["']\/community\/anime-lounge["']/i);
   assert.doesNotMatch(html,/private@example\.test/);
-  assert.doesNotMatch(html,/href=["']\/discover\/fitness["']/i);
+  assert.doesNotMatch(html,/href=["']\/discover\/music["']/i);
 });
 
 test("topic page renders only genuinely matching public Communities and unique canonical metadata",async()=>{
