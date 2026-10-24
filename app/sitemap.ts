@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 
 import { fetchCommunitySitemapEntries } from "../lib/community-sitemap";
+import { fetchPublicCommunityCatalog } from "../lib/community-catalog";
+import { getAvailableDiscoverTopics } from "../lib/discover-topics";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const lastModified = new Date("2026-07-23T00:00:00+02:00");
@@ -12,6 +14,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified,
       changeFrequency: "weekly",
       priority: 1,
+    },
+    {
+      url: "https://gubify.com/discover",
+      lastModified: new Date("2026-10-24T00:00:00+02:00"),
+      changeFrequency: "weekly",
+      priority: 0.85,
     },
     {
       url: "https://gubify.com/communities",
@@ -45,9 +53,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: "https://gubify.com/fundraising", lastModified, changeFrequency: "monthly", priority: 0.6 },
   ];
 
-  const communities = await fetchCommunitySitemapEntries();
+  const [communities, catalog] = await Promise.all([fetchCommunitySitemapEntries(), fetchPublicCommunityCatalog()]);
+  const topics = getAvailableDiscoverTopics(catalog);
   return [
     ...staticEntries,
+    ...topics.map(topic => ({ url: `https://gubify.com/discover/${topic.slug}`, changeFrequency: "weekly" as const, priority: 0.7 })),
     ...communities.map(({ slug, updatedAt }) => ({
       url: `https://gubify.com/community/${slug}`,
       lastModified: updatedAt,
