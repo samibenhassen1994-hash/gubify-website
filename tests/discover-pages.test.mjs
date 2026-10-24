@@ -28,8 +28,8 @@ test("Discover matches real public catalog records without invented data or broa
   assert.deepEqual(getDiscoverMatches(sample, "technology").map((x) => x.slug), ["tech-builders"]);
   assert.deepEqual(getDiscoverMatches(sample, "gaming").map((x) => x.slug), ["night-gamers", "arcade-italia"]);
   assert.deepEqual(getDiscoverMatches(sample, "gaming-in-italy").map((x) => x.slug), ["arcade-italia"]);
-  assert.deepEqual(getDiscoverMatches(sample, "fitness"), []);
-  assert.equal(getAvailableDiscoverTopics(sample).some((x) => x.slug === "fitness"), false);
+  assert.deepEqual(getDiscoverMatches(sample, "fitness").map((x) => x.slug), ["sports-lombardia"]);
+  assert.equal(getAvailableDiscoverTopics(sample).some((x) => x.slug === "music"), false);
   assert.equal(getAvailableDiscoverTopics(sample).some((x) => x.slug === "gaming-in-italy"), true);
   const italianByLanguageOnly = [{ ...sample[0], language:"Italian" }];
   assert.deepEqual(getDiscoverMatches(italianByLanguageOnly, "gaming-in-italy"), []);
@@ -96,7 +96,7 @@ test("Italy topic requires explicit geography in public descriptions",async()=>{
 });
 
 test("empty and unknown topics are 404, not thin indexable pages",async()=>{
-  assert.equal((await request("/discover/fitness")).status,404);
+  assert.equal((await request("/discover/music")).status,404);
   assert.equal((await request("/discover/completely-made-up-topic")).status,404);
 });
 
