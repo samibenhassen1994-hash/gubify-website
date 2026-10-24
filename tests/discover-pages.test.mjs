@@ -102,7 +102,8 @@ test("empty and unknown topics are 404, not thin indexable pages",async()=>{
 
 test("upstream failure is not silently treated as no public Communities",async()=>{
   status=503;
-  const response=await request("/discover/gaming");
-  assert.notEqual(response.status,404);
-  assert.notEqual(response.status,200);
+  await assert.rejects(request("/discover/gaming"), error => {
+    assert.notEqual(error?.digest, "NEXT_NOT_FOUND");
+    return true;
+  });
 });
